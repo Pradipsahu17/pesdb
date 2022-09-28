@@ -1,0 +1,177 @@
+--  select * from loan.get_installment_report(0, '10/14/2021 12:00:00 AM','7/16/2022 12:00:00 AM', 0, False, False,False)
+
+-- DROP FUNCTION IF EXISTS loan.get_installment_report(integer, date, date, integer, boolean, boolean, boolean);
+
+CREATE OR REPLACE FUNCTION loan.get_installment_report(
+	office_id_ integer,
+	from_ date,
+	till_ date,
+	product_id_ integer,
+	below_inst_only_ boolean,
+	above_inst_only_ boolean,
+	no_fine_penalty_ boolean)
+    RETURNS TABLE(member_id bigint, member_name text, loan_id bigint, loan_account_number character varying, issue_date character varying, mat_date_ad date, maturity_date character varying, loan_duration integer, installments integer, inst_duration integer, curr_duration integer, inst_amount money, issue money, inst_receivable money, received money, inst_due money, over_payment money, no_of_payment integer, avg_payment money, principal_due money, fine money, penalty money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+BEGIN
+	CREATE TEMP TABLE _t(member_id bigint, member_name text,loan_id	bigint,loan_account_number character varying, issue_date date, mat_date_ad date,maturity_date character varying, loan_duration int, installments int, inst_duration int, curr_duration int, inst_amount money, issue money, inst_receivable money, received money, 
+	inst_due money, over_payment money, no_of_payment int, avg_payment money, principal_due money, fine money, penalty money) ON COMMIT DROP;
+	
+	CREATE TEMP TABLE _t1(member_id bigint	,member_name text,loan_id	bigint,loan_account_number character varying, issue_date date,mat_date_ad date,maturity_date character varying, loan_duration int, installments int, inst_duration int, curr_duration int, inst_amount money, issue money, inst_receivable money, received money, 
+	inst_due money, over_payment money, no_of_payment int, avg_payment money, principal_due money, fine money, penalty money) ON COMMIT DROP;	
+	
+	IF $1 = 0 THEN
+		IF product_id_ = 0 THEN
+			INSERT INTO _t(member_id,member_name,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id, c.customer_name, a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				'0', SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a 
+			INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND t.tran_date BETWEEN  $2 AND $3 
+			GROUP by a.loan_id, a.issue_date,c.customer_name;
+
+			INSERT INTO _t1(member_id,member_name,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id,c.customer_name,a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				SUM(COALESCE(t.issue, '0')), SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND t.tran_date <= $3 
+			GROUP by a.loan_id, a.issue_date,c.customer_name;		
+		ELSE
+			INSERT INTO _t(member_id,member_name ,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id,c.customer_name,a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				'0', SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND t.tran_date BETWEEN $2 AND $3 AND a.loan_product_id = product_id_
+			GROUP by a.loan_id, a.issue_date,c.customer_name;
+
+			INSERT INTO _t1(member_id,member_name,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id,c.customer_name,a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				COALESCE(a.amount, '0') + COALESCE(a.old_amount, '0'), SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND t.tran_date <= $3 
+			AND a.loan_product_id = product_id_
+			GROUP by a.loan_id, a.issue_date,c.customer_name;		
+		END IF;
+		
+	ELSE
+		IF product_id_ = 0 THEN
+			INSERT INTO _t(member_id,member_name,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id,c.customer_name, a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				'0', SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND a.office_id = $1 AND t.tran_date BETWEEN  $2 AND $3 
+			GROUP by a.loan_id, a.issue_date,c.customer_name;
+
+			INSERT INTO _t1(member_id,member_name,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id,c.customer_name,a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				SUM(COALESCE(t.issue, '0')), SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND a.office_id = $1 AND t.tran_date <= $3 
+			GROUP by a.loan_id, a.issue_date,c.customer_name;		
+		ELSE
+			INSERT INTO _t(member_id ,member_name,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id,c.customer_name,a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				'0', SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND a.office_id = $1 AND t.tran_date BETWEEN $2 AND $3 AND a.loan_product_id = product_id_
+			GROUP by a.loan_id, a.issue_date,c.customer_name;
+
+			INSERT INTO _t1(member_id,member_name,loan_id,loan_account_number, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, fine, penalty)
+			SELECT a.customer_id,c.customer_name,a.loan_id,a.loan_account_number, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($3 - a.issue_date::date)::int, 
+				COALESCE(a.amount, '0') + COALESCE(a.old_amount, '0'), SUM(COALESCE(t.principal, '0')),SUM(COALESCE(t.fine, '0')),SUM(COALESCE(t.penalty, '0'))
+			FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			WHERE a.is_dead = false AND a.office_id = $1 AND t.tran_date <= $3 
+			AND a.loan_product_id = product_id_
+			GROUP by a.loan_id, a.issue_date,c.customer_name;		
+		END IF;
+	END IF;
+	
+	UPDATE _t SET issue= _t1.issue
+ 	FROM _t1
+ 	WHERE  _t.loan_id = _t1.loan_id;
+
+ 	UPDATE _t SET inst_amount = (COALESCE(_t.issue, '0') / _t.installments::money)::numeric::money;
+ 	UPDATE _t SET inst_receivable = (_t1.curr_duration / _t1.inst_duration) * _t.inst_amount FROM _t1 WHERE _t.curr_duration <= _t.loan_duration
+ 	AND _t.loan_id = _t1.loan_id;
+ 	UPDATE _t SET inst_receivable = _t.issue WHERE _t.curr_duration > _t.loan_duration;
+
+ 	
+	UPDATE _t SET received = _t1.received
+	FROM _t1
+	WHERE _t.loan_id=_t1.loan_id;
+ 	UPDATE _t SET inst_due = _t.inst_receivable - _t.received WHERE _t.inst_receivable > _t.received;
+ 	
+ 	UPDATE _t SET over_payment = _t.received - _t.inst_receivable WHERE _t.inst_receivable < _t.received;
+
+	IF below_inst_only_ = true THEN
+		DELETE FROM _t WHERE COALESCE(_t.inst_due, '0') <= '0';
+	END IF;
+ 
+	IF above_inst_only_ = true THEN
+		DELETE FROM _t WHERE COALESCE(_t.over_payment, '0') <= '0';
+	END IF;
+
+	IF no_fine_penalty_ = true THEN
+		DELETE FROM _t WHERE _t.fine > '0';
+		DELETE FROM _t WHERE _t.penalty>'0';
+	END IF;
+
+	UPDATE _t SET no_of_payment = t.nop FROM (
+	SELECT v.loan_id, COUNT(*) nop
+	FROM loan.principal_transaction_view v WHERE v.tran_date <= $3 AND COALESCE(v.credit, '0') > '0'
+	GROUP BY v.loan_id) t WHERE _t.loan_id = t.loan_id;
+ 	UPDATE _t SET avg_payment = _t.received / COALESCE(_t.no_of_payment, 1);
+
+ 	UPDATE _t SET principal_due = COALESCE(_t.issue, '0') - COALESCE(_t.received, '0');
+ 	DELETE FROM _t WHERE _t.principal_due = '0';
+
+ 	INSERT INTO _t(issue, inst_receivable, received, inst_due, over_payment, principal_due) 
+ 	SELECT SUM(COALESCE(_t.issue,'0')), SUM(COALESCE(_t.inst_receivable,'0')), SUM(COALESCE(_t.received,'0')), SUM(COALESCE(_t.inst_due,'0')), 
+ 	SUM(COALESCE(_t.over_payment,'0')), SUM(COALESCE(_t.principal_due,'0')) FROM _t;
+
+UPDATE _t SET mat_date_ad=r.value_date + r.days_to_add
+	FROM loan.loan_reimburse r
+	WHERE _t.loan_id=r.loan_id
+	AND r.status=true;
+	
+	UPDATE _t SET mat_date_ad=a.issue_date::date + a.loan_duration
+	FROM loan.loan_grant a
+	WHERE a.loan_id=_t.loan_id
+	AND _t.mat_date_ad IS NULL;
+	
+	UPDATE _t SET maturity_date=d.date_in_bs
+	FROM core.date_conversion d
+	WHERE _t.mat_date_ad=d.date_in_ad;
+--
+UPDATE _t1 SET mat_date_ad=r.value_date + r.days_to_add
+	FROM loan.loan_reimburse r
+	WHERE _t1.loan_id=r.loan_id
+	AND r.status=true;
+	
+	UPDATE _t1 SET mat_date_ad=a.issue_date::date + a.loan_duration
+	FROM loan.loan_grant a
+	WHERE a.loan_id=_t1.loan_id
+	AND _t1.mat_date_ad IS NULL;
+	
+	UPDATE _t1 SET maturity_date=d.date_in_bs
+	FROM core.date_conversion d
+	WHERE _t1.mat_date_ad=d.date_in_ad;
+
+	RETURN QUERY(SELECT _t.member_id, _t.member_name,_t.loan_id,_t.loan_account_number, core.date_bs_from_ad(_t.issue_date),_t.mat_date_ad,_t.maturity_date, _t.loan_duration, _t.installments, _t.inst_duration, _t.curr_duration, _t.inst_amount, _t.issue, _t.inst_receivable, _t.received, 
+	_t.inst_due, _t.over_payment, _t.no_of_payment, _t.avg_payment, _t.principal_due, _t.fine, _t.penalty FROM _t ORDER BY _t.loan_id);
+END
+
+$BODY$;

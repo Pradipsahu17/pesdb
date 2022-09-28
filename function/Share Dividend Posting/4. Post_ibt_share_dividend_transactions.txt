@@ -1,0 +1,173 @@
+-- FUNCTION: transactions.post_ibt_share_dividend_transactions(integer, date, bigint, bigint)
+
+-- DROP FUNCTION IF EXISTS transactions.post_ibt_share_dividend_transactions(integer, date, bigint, bigint);
+
+CREATE OR REPLACE FUNCTION transactions.post_ibt_share_dividend_transactions(
+	user_id_ integer,
+	to_ date,
+	share_dividened_gl_acc bigint,
+	tax_gl_acc bigint)
+    RETURNS TABLE(office_id integer, tran_id bigint) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE count_ integer := (SELECT COUNT(office_id) FROM office.offices);
+	DECLARE office_id_ integer := (SELECT o.office_id FROM office.offices o WHERE parent_office_id IS NULL);
+	DECLARE _tran_id bigint;
+	DECLARE _tran_id_b bigint;
+	DECLARE i integer := 1;
+	DECLARE _office_id integer;
+	DECLARE branch_gl_ bigint:= (SELECT local_receivable_gl_account_id FROM core.ibt_setup WHERE local_office_id = office_id_ LIMIT 1);
+	BEGIN
+		IF count_ > 1 THEN
+		
+			-- Head Office transactions
+			INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+			select office_id_, $2, $2, 'DivSav2078', 'Vouchers', o.amt, 0, 1, 0, 0
+			from (SELECT sum(coalesce(dividend,'0'))amt from core.share_dividend_posting
+			where account_no is not null)o;
+
+			SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+			-- dividend
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, debit, statement_reference, audit_user_id)
+			select _tran_id, $3, o.amt, 'Dividend 2077-2078', $1
+			from (SELECT sum(coalesce(dividend,'0'))amt from core.share_dividend_posting
+			where account_no is not null)o;
+
+			-- tax
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			select _tran_id, $4, o.amt, 'Dividend 2077-2078', $1
+			from (SELECT sum(coalesce(tax,'0'))amt from core.share_dividend_posting
+			where account_no is not null)o;
+
+			-- net
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			select _tran_id, o.gl, o.amt, 'Dividend 2077-2078', 0
+			from (SELECT core.share_dividend_posting.office_id, s.local_payable_gl_account_id gl,sum(coalesce(net,'0'))amt from core.share_dividend_posting
+			inner join core.ibt_setup s on core.share_dividend_posting.office_id = s.local_office_id
+			where account_no is not null
+			and remote_office_id = office_id_
+			group by core.share_dividend_posting.office_id,s.local_payable_gl_account_id
+			order by office_id)o
+			, transactions.transactions t
+			where t.tran_id= _tran_id;
+
+
+			--Personal_transaction_in_corporate_office
+			INSERT INTO transactions.transaction_details(tran_id,share_account_id ,account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, null,d.posting_ac_id,d.posting_ac_product_gl,  d.saving_post, 'Share Dividend 2077-2078 '|| d.share_no,0
+			FROM core.share_dividend_posting d
+			WHERE d.account_no is not null
+			AND d.office_id= office_id_
+
+			UNION ALL 
+			SELECT _tran_id, d.share_account_id, NULL,p.gl_account_id,  d.share_post, 'Share Dividend 2077-2078 '|| d.share_no,0
+			FROM core.share_dividend_posting d INNER JOIN core.share_products p on d.share_product = p.share_product_name
+			WHERE d.office_id= office_id_
+			AND d.account_no is not null;
+
+			-- Transaction Table 
+
+			CREATE TABLE IF NOT EXISTS transactions.sd_transactions(order_id integer, office_id integer, tran_id bigint);
+			DELETE FROM transactions.sd_transactions;
+			INSERT INTO transactions.sd_transactions(order_id,office_id, tran_id)
+			SELECT ROW_NUMBER() OVER (ORDER BY o.office_id),o.office_id, 0 
+			FROM office.offices o
+			WHERE parent_office_id IS NOT null
+			ORDER BY office_id;
+	-- 		select * from transactions.sd_transactions
+
+			-- 	FOR BRANCH 
+			LOOP
+				SELECT _t.office_id INTO _office_id FROM transactions.sd_transactions _t WHERE _t.order_id = i;
+
+				INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+				SELECT office_id_, $2, $2, 'DivSav2078', 'Vouchers', o.amt, 0, 1, 0, 0
+				FROM (SELECT sum(coalesce(net,'0'))amt FROM core.share_dividend_posting d
+				WHERE d.account_no IS NOT null
+				AND d.office_id = _office_id)o;
+
+				SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id_b;
+				UPDATE  transactions.sd_transactions _t SET tran_id = _tran_id_B WHERE _t.office_id = _office_id;
+
+				INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, debit, statement_reference, audit_user_id)
+				SELECT _tran_id_b, branch_gl_, o.amt, 'Dividend 2077-2078', $1
+				FROM (SELECT sum(coalesce(net,'0'))amt FROM core.share_dividend_posting d
+				WHERE d.account_no IS NOT null
+				AND d.office_id = _office_id)o;
+
+				-- saving and share post
+				INSERT INTO transactions.transaction_details(tran_id,share_account_id ,account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+				SELECT _tran_id_b, null,d.posting_ac_id,d.posting_ac_product_gl,  d.saving_post, 'Share Dividend 2077-2078 '|| d.share_no,0
+				FROM core.share_dividend_posting d
+				WHERE d.account_no IS NOT null
+				AND d.office_id= _office_id
+
+				UNION ALL 
+				SELECT _tran_id_b, d.share_account_id, NULL,p.gl_account_id,  d.share_post, 'Share Dividend 2077-2078 '|| d.share_no,0
+				FROM core.share_dividend_posting d INNER JOIN core.share_products p ON d.share_product = p.share_product_name
+				WHERE d.office_id = _office_id
+				AND d.account_no IS NOT null;
+
+				i := i + 1;
+
+				EXIT WHEN i > (SELECT count(order_id) FROM transactions.sd_transactions);
+			END LOOP;
+
+			INSERT INTO transactions.sd_transactions(order_id, office_id, tran_id) 
+			SELECT ROW_NUMBER() OVER (ORDER BY office_id), office_id_, _tran_id;
+
+			RETURN QUERY(SELECT _t.office_id, _t.tran_id FROM transactions.sd_transactions _t ORDER BY _t.office_id);
+			
+		ELSE
+			
+			-- transactions
+			INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+			select office_id_, $3, $3, 'DivSav2078', 'Vouchers', o.amt, 0, 1, 0, 0
+			from (SELECT sum(coalesce(dividend,'0'))amt from core.share_dividend_posting
+			where account_no is not null 
+			and office_id = office_id_)o;
+
+			SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+			-- dividend
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, debit, statement_reference, audit_user_id)
+			select _tran_id, $4, o.amt, 'Dividend 2077-2078', $2
+			from (SELECT sum(coalesce(dividend,'0'))amt from core.share_dividend_posting
+			where account_no is not null
+			and office_id = office_id_)o;
+			
+			-- dividend
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			select _tran_id, $4, o.amt, 'Dividend 2077-2078', $2
+			from (SELECT sum(coalesce(tax,'0'))amt from core.share_dividend_posting
+			where account_no is not null
+			and office_id = office_id_)o;			
+
+			-- saving_post & share_post
+			INSERT INTO transactions.transaction_details(tran_id,share_account_id ,account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, null,d.posting_ac_id,d.posting_ac_product_gl,  d.saving_post, 'Share Dividend 2077-2078 '|| d.share_no,0
+			FROM core.share_dividend_posting d
+			WHERE d.account_no is not null
+			AND d.office_id= office_id_
+			AND d.saving_post <> 0::money
+
+			UNION ALL 
+			SELECT _tran_id, d.share_account_id, NULL,p.gl_account_id,  d.share_post, 'Share Dividend 2077-2078 '|| d.share_no,0
+			FROM core.share_dividend_posting d INNER JOIN core.share_products p on d.share_product = p.share_product_name
+			WHERE d.office_id= office_id_
+			AND d.account_no is not null
+			AND d.share_post <> 0::money;
+
+			RETURN QUERY (SELECT office_id_,_tran_id);
+			
+		END IF;
+	END
+$BODY$;
+
+ALTER FUNCTION transactions.post_ibt_share_dividend_transactions(integer, date, bigint, bigint)
+    OWNER TO postgres;

@@ -1,0 +1,161 @@
+-- FUNCTION: transactions.get_balance_sheet(integer, integer, date, date)
+
+-- DROP FUNCTION IF EXISTS transactions.get_balance_sheet(integer, integer, date, date);
+
+CREATE OR REPLACE FUNCTION transactions.get_balance_sheet(
+	office_id_ integer,
+	user_id_ integer,
+	from_ date,
+	to_ date)
+    RETURNS TABLE(head character varying, balance money, is_heading integer) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE _ass_id		bigint;
+	DECLARE _liab_id	bigint;
+	DECLARE _gl_account_id	bigint;
+	DECLARE _profit		money;
+BEGIN
+	CREATE TEMP TABLE _t(id serial not null primary key, gl_id bigint, parent_id bigint, balance money, head character varying(100), group_id int) ON COMMIT DROP;
+
+	SELECT gl_account_id INTO _ass_id FROM core.gl_accounts WHERE account_name = 'Assets';
+	SELECT gl_account_id INTO _liab_id FROM core.gl_accounts WHERE account_name = 'Liabilities';
+
+	DELETE FROM core.temp_report WHERE user_id = $2 AND details='bs';
+
+	IF office_id_ <= 0 THEN
+		INSERT INTO core.temp_report(office_id, gl_account_id, debit, credit, details, user_id)
+		SELECT $1, t.gl_account_id, 
+			CASE WHEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit, '0')),'0') ELSE NULL END debit,
+			CASE WHEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') ELSE NULL END credit,
+			'bs', $2
+		FROM transactions.transactions_view t
+		WHERE tran_date between $3 and $4
+		AND t.gl_account_id IN (SELECT UNNEST(core.get_child_accounts(_ass_id)) UNION ALL SELECT UNNEST(core.get_child_accounts(_liab_id)))
+		GROUP BY t.gl_account_id;
+	ELSE
+		INSERT INTO core.temp_report(office_id, gl_account_id, debit, credit, details, user_id)
+		SELECT $1, t.gl_account_id, 
+			CASE WHEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit, '0')),'0') ELSE NULL END debit,
+			CASE WHEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') ELSE NULL END credit,
+			'bs', $2
+		FROM transactions.transactions_view t
+		WHERE tran_date between $3 and $4
+		AND office_id = $1
+		AND t.gl_account_id IN (SELECT UNNEST(core.get_child_accounts(_ass_id)) UNION ALL SELECT UNNEST(core.get_child_accounts(_liab_id)))
+		GROUP BY t.gl_account_id;
+	END IF;
+	
+	UPDATE core.temp_report SET parent_id = gl.parent_gl_account_id FROM core.gl_accounts gl
+	WHERE core.temp_report.gl_account_id = gl.gl_account_id;
+
+	INSERT INTO _t(head, group_id) SELECT 'Current Assets', 10;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 80;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Cash', 1;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.debit,'0') - COALESCE(r.credit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 90;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Bank', 1;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.debit,'0') - COALESCE(r.credit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 100;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Investments', 1;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.debit,'0') - COALESCE(r.credit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 110;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Loan Investment', 1;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.debit,'0') - COALESCE(r.credit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 120;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Receivables', 1;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.debit,'0') - COALESCE(r.credit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	INSERT INTO _t(head, group_id) SELECT 'Non Current Assets', 10;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 130;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Fixed Assets', 1;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.debit,'0') - COALESCE(r.credit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 140;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Other Assets', 1;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.debit,'0') - COALESCE(r.credit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	INSERT INTO _t(head, group_id) SELECT 'Total Assets', 10;
+	INSERT INTO _t(head, group_id) SELECT 'Liabilities', 10;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 30;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Deposits', 2;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.credit,'0') - COALESCE(r.debit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 40;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Loan Payables', 2;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.credit,'0') - COALESCE(r.debit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 50;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Donation Payables', 2;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.credit,'0') - COALESCE(r.debit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 60;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Account Payables', 2;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.credit,'0') - COALESCE(r.debit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 70;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Other Payables', 2;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.credit,'0') - COALESCE(r.debit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	INSERT INTO _t(head, group_id) SELECT 'Share Holder''s Equity', 10;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 10;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Share Capital', 2;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.credit,'0') - COALESCE(r.debit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	SELECT gl_account_id INTO _gl_account_id FROM core.char_khata WHERE code = 20;
+	INSERT INTO _t(gl_id, parent_id, balance, head, group_id) SELECT _gl_account_id, null, null, 'Reserve Fund', 2;
+	INSERT INTO _t(gl_id, parent_id, balance, group_id) SELECT r.gl_account_id, _gl_account_id, COALESCE(r.credit,'0') - COALESCE(r.debit,'0'), NULL 
+	FROM core.temp_report r WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='bs' AND r.user_id=$2;
+
+	INSERT INTO _t(head, balance, group_id) SELECT 'Profit & Loss A/C', 0, 2;
+	INSERT INTO _t(head, group_id) SELECT 'Total Liabilities', 10;
+
+  	UPDATE _t SET balance = t.bal
+  	FROM (
+  		SELECT _t.parent_id gl, SUM(COALESCE(_t.balance, '0')) bal
+  		FROM _t GROUP BY _t.parent_id
+  	) t WHERE t.gl = _t.gl_id;
+
+	UPDATE _t SET balance = (SELECT SUM(COALESCE(_t.balance,'0')) FROM _t WHERE _t.group_id = 1) WHERE _t.head='Total Assets';
+	UPDATE _t SET balance = (SELECT SUM(COALESCE(_t.balance,'0')) FROM _t WHERE _t.group_id = 2) WHERE _t.head='Total Liabilities';
+
+	SELECT((SELECT COALESCE(_t.balance,'0') FROM _t WHERE _t.head = 'Total Assets') - (SELECT COALESCE(_t.balance,'0') FROM _t WHERE _t.head = 'Total Liabilities')) INTO _profit;
+	UPDATE _t SET balance = _profit WHERE _t.head =  'Profit & Loss A/C';
+	UPDATE _t SET balance = coalesce(_t.balance,'0') + COALESCE(_profit, '0') WHERE _t.head =  'Total Liabilities';
+
+	UPDATE _t SET head = g.account_name FROM core.gl_accounts g WHERE _t.gl_id = g.gl_account_id AND _t.group_id IS NULL;
+	
+	DELETE FROM _t WHERE COALESCE(_t.balance,'0') = '0' AND _t.group_id <> 10;
+	UPDATE _t SET group_id = 1 WHERE COALESCE(_t.group_id, 50)<>50;
+
+	DELETE FROM _t WHERE COALESCE(_t.balance,'0') = '0' AND group_id IS NULL;
+	RETURN QUERY(SELECT _t.head, _t.balance, _t.group_id FROM _t ORDER BY _t.id);
+END
+$BODY$;
+
+ALTER FUNCTION transactions.get_balance_sheet(integer, integer, date, date)
+    OWNER TO postgres;

@@ -1,0 +1,76 @@
+-- SELECT * FROM loan.get_transaction_report_details(2::int, '2020-10-10'::date, '2021-10-10'::date, 'all'::character varying(20), 0::int, 0::int, 0::smallint, 0::smallint, false,0)
+
+-- DROP FUNCTION loan.get_transaction_report_details(integer,date,date,character varying,integer,integer,smallint,smallint,boolean, integer)
+
+CREATE OR REPLACE FUNCTION loan.get_transaction_report_details(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	trans_type_ character varying,
+	product_id_ integer,
+	user_id_ integer,
+	ibt_type_ smallint,
+	cash_type_ smallint,
+	auto_payement_ boolean,
+	collector_id_ integer)
+	RETURNS TABLE(sn bigint, tran_id bigint, tran_date character varying, value_date character varying, loan_account_number character varying, product_name character varying, member_name text, member_address text, contact_number text, issue money , payment money, principal money, interest money , fine money, penalty money, idiscount money , pdiscount money, loan_collection boolean, collector_name character varying, audit_user character varying, office_code character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		CREATE TEMP TABLE _t(
+			sn bigint, 
+			tran_id bigint, 
+			tran_date character varying, 
+			value_date character varying, 
+			loan_account_number character varying, 
+			product_name character varying, 
+			member_name text, 
+			member_address text, 
+			contact_number text, 
+			issue money , 
+			payment money, 
+			principal money, 
+			interest money , 
+			fine money, 
+			penalty money, 
+			idiscount money , 
+			pdiscount money, loan_collection boolean,
+			collector_name character varying,
+			audit_user character varying, 
+			office_code character varying
+		) ON COMMIT DROP;
+		
+		IF $10 = 0 THEN
+			INSERT INTO _t
+			SELECT t.sn, t.tran_id, t.tran_date, t.value_date, a.loan_account_number, p.loan_product_name , c.customer_name, 
+			   c.permanent_address, c.contact_number, t.issue, t.payment, t.principal, t.interest, t.fine, t.penalty, t.idiscount, t.pdiscount, 
+			   t.loan_collection, co.collector_name, u.user_name, office.get_office_code_by_id(transactions.get_transaction_office_id(t.tran_id))
+			FROM loan.get_transaction_report($1, $2, $3, $4, $5, $6, $7, $8, $9) t 
+			INNER JOIN loan.loan_grant a ON t.loan_id = a.loan_id 
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id 
+			INNER JOIN office.users u ON t.user_id = u.user_id 
+			INNER JOIN loan.loan_products p ON a.loan_product_id = p.loan_product_id
+			INNER JOIN office.collectors co ON a.collector_id = co.collector_id;
+		ELSE
+			INSERT INTO _t
+			SELECT t.sn, t.tran_id, t.tran_date, t.value_date, a.loan_account_number, p.loan_product_name , c.customer_name, 
+			   c.permanent_address, c.contact_number, t.issue, t.payment, t.principal, t.interest, t.fine, t.penalty, t.idiscount, t.pdiscount, 
+			   t.loan_collection, co.collector_name, u.user_name, office.get_office_code_by_id(transactions.get_transaction_office_id(t.tran_id))
+			FROM loan.get_transaction_report($1, $2, $3, $4, $5, $6, $7, $8, $9) t 
+			INNER JOIN loan.loan_grant a ON t.loan_id = a.loan_id 
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id 
+			INNER JOIN office.users u ON t.user_id = u.user_id 
+			INNER JOIN loan.loan_products p ON a.loan_product_id = p.loan_product_id
+			INNER JOIN office.collectors co ON a.collector_id = co.collector_id
+			WHERE  a.collector_id = $10;
+		END IF;
+		
+		INSERT INTO _t(product_name, issue, payment, principal, interest, fine, penalty, idiscount, pdiscount)
+		SELECT  '        Total', SUM(COALESCE(_t.issue, '0')), SUM(COALESCE(_t.payment, '0')), SUM(COALESCE(_t.principal, 0::money)),SUM(COALESCE(_t.interest, 0::money)), SUM(COALESCE(_t.fine, 0::money)), SUM(COALESCE(_t.penalty, 0::money)), SUM(COALESCE(_t.idiscount, 0::money)), SUM(COALESCE(_t.pdiscount, 0::money)) FROM _t;
+		
+		RETURN QUERY(SELECT * FROM _t);
+	END
+$BODY$;
+

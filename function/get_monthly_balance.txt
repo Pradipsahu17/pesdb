@@ -1,0 +1,47 @@
+-- select * from core.get_monthly_balance(2, 116, '2021-05-10', '2021-10-10')
+
+-- DROP FUNCTION IF EXISTS core.get_monthly_balance(integer, bigint, date, date);
+
+CREATE OR REPLACE FUNCTION core.get_monthly_balance(
+	office_id_ integer,
+	ledger_id_ bigint,
+	from_ date,
+	to_ date)
+    RETURNS TABLE(sn integer, month character varying, balance money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE i integer = 1;
+	DECLARE _till_date date;
+	DECLARE _balance money;
+	DECLARE _count integer;
+BEGIN
+	CREATE TEMP TABLE _t(id serial,month character varying, balance money) ON COMMIT DROP;
+	
+	CREATE TEMP TABLE _t1(id serial, date_id date) ON COMMIT DROP;
+	INSERT INTO _t1(date_id)
+	SELECT task_date::date 
+	FROM core.financial_information 
+	WHERE task_date BETWEEN $3 AND $4;
+	
+	INSERT INTO _t(month)
+	SELECT m.month_name_english
+	FROM _t1
+	INNER JOIN core.date_conversion d ON _t1.date_id = d.date_in_ad
+	INNER JOIN core.months m ON d.bs_month_id = m.month_id;
+
+	_count := (SELECT count(*) FROM _t1);
+
+	LOOP
+		_till_date := (SELECT date_id FROM _t1 WHERE _t1.id = i);
+		_balance := (SELECT * FROM core.get_balance_dv_mv($2, $1, _till_date));
+		UPDATE _t SET balance = _balance WHERE _t.id = i;
+		i = i + 1;
+		EXIT WHEN i > _count;
+	END LOOP;
+	RETURN QUERY(SELECT * FROM _t);
+END
+$BODY$;

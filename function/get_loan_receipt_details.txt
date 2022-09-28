@@ -1,0 +1,151 @@
+-- select * from loan.get_loan_receipt_details(2,'2021-10-10','2021-11-11',44)
+
+-- DROP FUNCTION IF EXISTS loan.get_loan_receipt_details(integer, date, date);
+
+CREATE OR REPLACE FUNCTION loan.get_loan_receipt_details(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	collector_id_ integer)
+    RETURNS TABLE(receipt_id bigint, receipt_date character varying, int_date character varying, ac_number character varying, memeber_name text, address text, debit_ledger character varying, payment money, principal money, interest money, fine money, penalty money, int_discount money, p_discount money, rem_int money,collector_name character varying) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE _t(
+		receipt_id bigint, 
+		receipt_date character varying,
+		int_date character varying, 
+		ac_Number character varying(50),
+		memeber_name text,
+		address text,
+		debit_ledger character varying,
+		payment money,
+		principal money,
+		interest money,
+		fine money,
+		penalty money,
+		int_discount money,
+		p_discount money,
+		rem_int money,
+		collector_name character varying) ON COMMIT DROP;
+		
+	IF $1 = 0 THEN
+		IF $4 = 0 THEN
+			INSERT INTO _t	
+			SELECT t.receipt_id , core.date_bs_from_ad(t.tran_date), 
+				core.date_bs_from_ad(t.interest_date), 
+				l.loan_account_number,
+				c.customer_name, 
+				c.permanent_address,
+				loan.get_debit_ledger(t.receipt_id),
+				t.payment,
+				t.principal,
+				t.interest,
+				t.fine, 
+				t.penalty,
+				t.idiscount, 
+				t.pdiscount,
+				t.remaining_interest,
+				co.collector_name 
+			FROM loan.loan_receipts_view t
+			INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+			INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+			INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+			WHERE t.tran_date BETWEEN $2 AND $3;
+		ELSE
+			INSERT INTO _t	
+			SELECT t.receipt_id , core.date_bs_from_ad(t.tran_date), 
+				core.date_bs_from_ad(t.interest_date), 
+				l.loan_account_number,
+				c.customer_name, 
+				c.permanent_address,
+				loan.get_debit_ledger(t.receipt_id),
+				t.payment,
+				t.principal,
+				t.interest,
+				t.fine, 
+				t.penalty,
+				t.idiscount, 
+				t.pdiscount,
+				t.remaining_interest,
+				co.collector_name 
+			FROM loan.loan_receipts_view t
+			INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+			INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+			INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+			WHERE t.tran_date BETWEEN $2 AND $3
+			AND l.collector_id = $4;
+		END IF;
+	ELSE
+		IF $4 = 0 THEN
+			INSERT INTO _t	
+			SELECT t.receipt_id , core.date_bs_from_ad(t.tran_date), 
+				core.date_bs_from_ad(t.interest_date), 
+				l.loan_account_number,
+				c.customer_name, 
+				c.permanent_address,
+				loan.get_debit_ledger(t.receipt_id),
+				t.payment,
+				t.principal,
+				t.interest,
+				t.fine, 
+				t.penalty,
+				t.idiscount, 
+				t.pdiscount,
+				t.remaining_interest,
+				co.collector_name
+			FROM loan.loan_receipts_view t
+			INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+			INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+			INNER JOIN office.collectors co ON co.collector_id = l.collector_id                                       
+			WHERE t.tran_date BETWEEN $2 AND $3
+			AND t.office_id = $1;
+		ELSE
+			INSERT INTO _t	
+			SELECT t.receipt_id , core.date_bs_from_ad(t.tran_date), 
+				core.date_bs_from_ad(t.interest_date), 
+				l.loan_account_number,
+				c.customer_name, 
+				c.permanent_address,
+				loan.get_debit_ledger(t.receipt_id),
+				t.payment,
+				t.principal,
+				t.interest,
+				t.fine, 
+				t.penalty,
+				t.idiscount, 
+				t.pdiscount,
+				t.remaining_interest,
+				co.collector_name
+			FROM loan.loan_receipts_view t
+			INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+			INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+			INNER JOIN office.collectors co ON co.collector_id = l.collector_id                                       
+			WHERE t.tran_date BETWEEN $2 AND $3
+			AND t.office_id = $1
+			AND l.collector_id = $4;
+		END IF;
+	END IF;
+	
+	INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, int_discount,p_discount,rem_int)
+	SELECT 'Total ',
+		SUM(_t.payment), 
+		SUM(_t.principal), 
+		SUM(_t.interest), 
+		SUM(_t.fine), 
+		SUM(_t.penalty), 
+		SUM(_t.int_discount),
+		SUM(_t.p_discount),
+		SUM(_t.rem_int)
+	FROM _t;
+	
+	RETURN QUERY(SELECT * FROM _t);
+END
+$BODY$;
+
+ALTER FUNCTION loan.get_loan_receipt_details(integer, date, date)
+    OWNER TO postgres;

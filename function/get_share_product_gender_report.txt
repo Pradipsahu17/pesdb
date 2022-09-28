@@ -1,0 +1,54 @@
+CREATE OR REPLACE FUNCTION core.get_share_product_gender_report(
+	)
+	RETURNS TABLE(share_product_id bigint, share_product_name character varying, Male bigint, Female bigint, Not_Applicable bigint)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT lg.share_product_id,
+				p.share_product_name,
+				m.male,
+				f.female,
+				n.not_applicable
+			FROM core.share_accounts lg 
+			INNER JOIN core.share_products p
+				ON lg.share_product_id = p.share_product_id
+			LEFT JOIN
+				(
+					SELECT count(g.gender_name) as male,
+						sa.share_product_id as product_id
+					FROM core.share_accounts sa 
+					INNER JOIN core.genders g 
+						ON sa.gender_id = g.gender_id 
+					WHERE sa.gender_id=1 
+					AND sa.share_product_id in (select sa.share_product_id from core.share_accounts sa) group by sa.share_product_id
+				) m ON lg.share_product_id = m.product_id 
+
+			LEFT JOIN
+				(
+					SELECT count(g.gender_name) as female,
+						sa.share_product_id as product_id
+					FROM core.share_accounts sa 
+					INNER JOIN core.genders g 
+						ON sa.gender_id = g.gender_id 
+					WHERE sa.gender_id=2 
+					AND sa.share_product_id in (select sa.share_product_id from core.share_accounts sa) group by sa.share_product_id
+				) f ON lg.share_product_id = f.product_id 
+
+			LEFT JOIN
+				(
+					SELECT count(g.gender_name) as not_applicable,
+						sa.share_product_id as product_id
+					FROM core.share_accounts sa 
+					INNER JOIN core.genders g 
+						ON sa.gender_id = g.gender_id 
+					WHERE sa.gender_id=3 
+					AND sa.share_product_id in (select sa.share_product_id from core.share_accounts sa) group by sa.share_product_id
+					) n ON lg.share_product_id = n.product_id
+
+			GROUP BY lg.share_product_id, p.share_product_name, m.male, f.female, n.not_applicable
+		);
+	END
+$BODY$;

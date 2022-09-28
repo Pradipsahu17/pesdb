@@ -1,0 +1,120 @@
+
+CREATE TABLE IF NOT EXISTS core.post_setup(
+	post_id serial PRIMARY KEY UNIQUE NOT NULL,
+	post_name character varying NOT NULL,
+	post_name_nep character varying,
+	is_active boolean DEFAULT false,
+	audit_user_id integer NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now()
+);
+
+
+
+
+
+CREATE OR REPLACE FUNCTION core.update_committee_year_status()
+	RETURNS trigger
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE NOT LEAKPROOF
+AS $BODY$
+DECLARE committee_year_id_ integer;
+BEGIN
+	committee_year_id_ := NEW.committee_year_id;
+	IF NEW.committee_year_id IS NOT NULL THEN 
+		UPDATE core.committee_year_setup SET status = 'false' WHERE committee_year_id <> committee_year_id_;
+	END IF;
+	
+	RETURN NEW;
+END
+$BODY$;
+
+
+
+
+
+CREATE TABLE IF NOT EXISTS core.committee_year_setup(
+	committee_year_id serial PRIMARY KEY UNIQUE NOT NULL,
+	start_date date NOT NULL,
+	end_date date NOT NULL,
+	status boolean DEFAULT true,
+	audit_user integer NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now()
+);
+
+CREATE TRIGGER update_status_on_committee_year
+    AFTER INSERT
+    ON core.committee_year_setup
+    FOR EACH ROW
+    EXECUTE FUNCTION core.update_committee_year_status();
+
+
+
+
+
+
+CREATE TABLE IF NOT EXISTS core.committee_setup(
+	committee_setup_id serial PRIMARY KEY UNIQUE NOT NULL,
+	committee_year_id integer REFERENCES core.committee_year_setup (committee_year_id) NOT NULL,
+	post_id integer REFERENCES core.post_setup (post_id) NOT NULL,
+	member_id integer REFERENCES core.customers (customer_id) NOT NULL,
+	relation_staff_id json NULL,
+	audit_user integer NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now()
+);
+
+
+
+
+
+CREATE TABLE IF NOT EXISTS core.committee_setup(
+	committee_setup_id serial PRIMARY KEY UNIQUE NOT NULL,
+	committee_year_id integer REFERENCES core.committee_year_setup (committee_year_id) NOT NULL,
+	post_id integer REFERENCES core.post_setup (post_id) NOT NULL,
+	member_id integer REFERENCES core.customers (customer_id) NOT NULL,
+	relation_staff_id json NULL,
+	note character varying, 
+	audit_user integer NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS committee_setup_id_ix
+	ON core.committee_setup USING btree
+	(committee_setup_id ASC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS committee_year_id_ix
+	ON core.committee_setup USING btree
+	(committee_year_id ASC NULLS LAST);
+	
+CREATE INDEX IF NOT EXISTS post_id_ix
+	ON core.committee_setup USING btree
+	(post_id ASC NULLS LAST);
+
+
+
+
+
+
+
+
+CREATE OR REPLACE VIEW core.committee_setup_view
+ AS 
+ 	SELECT s.committee_setup_id,
+		s.post_id,
+		p.post_name,
+		p.post_name_nep,
+		s.committee_year_id,
+		y.start_date,
+		core.date_bs_from_ad(y.start_date)::date AS start_date_bs,
+		y.end_date,
+		core.date_bs_from_ad(y.end_date)::date AS end_date_bs,
+		s.member_id,
+		s.relation_staff_id,
+		s.note,
+		s.audit_user_id,
+		u.user_name,
+		s.audit_ts
+	FROM core.committee_setup s
+	INNER JOIN core.post_setup p ON s.post_id = p.post_id
+	INNER JOIN core.committee_year_setup y ON s.committee_year_id = y.committee_year_id
+	INNER JOIN office.users u ON s.audit_user_id = u.user_id;\

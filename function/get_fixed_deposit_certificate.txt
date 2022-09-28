@@ -1,0 +1,40 @@
+-- DROP FUNCTION deposit.fixed_deposit_certificate(character varying)
+
+-- select * from deposit.fixed_deposit_certificate('1YFD-0000052')
+
+CREATE OR REPLACE FUNCTION deposit.fixed_deposit_certificate(
+	account_number_ character varying)
+    RETURNS TABLE(member_id bigint, member_name text, np_name character varying, member_address text, member_contact text, account_number character varying, account_open_date timestamp without time zone,account_open_date_bs  character varying, duration_in_days integer, deposited money, interest_rate double precision, maturity_date_in_ad date, maturity_date_in_bs character varying) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE _account_number_id bigint := (SELECT account_number_id FROM deposit.account_holders WHERE account_number = $1);
+	DECLARE _maturity_date date := (SELECT deposit.get_maturity_date(_account_number_id));
+	
+	BEGIN
+		RETURN QUERY(
+			SELECT a.customer_id,
+			c.customer_name,
+			c.nepali_name,
+			core.get_address(a.customer_id),
+			c.contact_number,
+			a.account_number,
+			a.account_open_date,
+			core.date_bs_from_ad(a.account_open_date::date),
+			a.duration_in_days,
+			deposit.get_balance($1),
+			a.interest_rate,
+			_maturity_date,
+			core.date_bs_from_ad(_maturity_date)
+			FROM deposit.account_holders a
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			WHERE duration_in_days>0 
+			AND a.account_number = (SELECT TRIM($1)) 
+			AND a.status = true
+		);
+	END
+$BODY$;

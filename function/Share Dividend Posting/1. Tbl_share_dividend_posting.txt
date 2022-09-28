@@ -1,0 +1,32 @@
+-- Table: core.share_dividend_posting
+
+-- DROP TABLE IF EXISTS core.share_dividend_posting;
+
+CREATE TABLE IF NOT EXISTS core.share_dividend_posting
+(
+    office_id integer,
+    customer_id bigint,
+    share_account_id bigint,
+    share_no character varying COLLATE pg_catalog."default",
+    share_product character varying COLLATE pg_catalog."default",
+    account_no character varying COLLATE pg_catalog."default",
+    posting_ac_product character varying COLLATE pg_catalog."default",
+    posting_ac_id bigint,
+    posting_ac_product_gl integer,
+    customer_name character varying COLLATE pg_catalog."default",
+    address character varying COLLATE pg_catalog."default",
+    days integer,
+    debit money,
+    credit money,
+    balance money,
+    dividend money,
+    tax money,
+    net money,
+    share_post money,
+    saving_post money
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS core.share_dividend_posting
+    OWNER to postgres;

@@ -1,0 +1,53 @@
+-- FUNCTION: atm.balance_inquiry(character varying, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS atm.balance_inquiry(character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION atm.balance_inquiry(
+	card_number_ character varying,
+	tran_type_ character varying,
+	bin_id_ character varying)
+    RETURNS TABLE(account_number character varying, balance money, ledger_balance money, interest_rate numeric, status text) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE account_number_ character varying := (SELECT dep_account FROM atm.atm_users WHERE card_number = $1);
+BEGIN	
+-- SCT VOSTRO A/C 99-58-00000066
+-- SCT OWNERSHIP CHARGE A/C 99-58-00000067
+-- SCT ATM CHARGE A/C 99-58-00000068  Issuer (Cooperative)  and remaining to vostro
+-- ATM ANNUAL CHARGE A/C 99-58-00000069
+
+	CREATE TEMP TABLE _bi(account_number character varying , 
+						  balance money, 
+						  ledger_balance money, 
+						  interest_rate numeric,
+						  status text) ON COMMIT DROP;
+
+	IF tran_type_ ='on_us' THEN
+		INSERT INTO _bi(account_number, balance, ledger_balance, interest_rate, status )
+		SELECT * FROM atm.balance_inquiry_on_us(account_number_ , tran_type_,$3) ;
+
+	elsif tran_type_ ='off_us' THEN
+		INSERT INTO _bi(account_number, balance, ledger_balance, interest_rate, status )
+		SELECT * FROM atm.balance_inquiry_off_us(account_number_ , tran_type_,$3) ;
+
+	elsif tran_type_ = 'off_us_upi' THEN
+		INSERT INTO _bi(account_number, balance, ledger_balance, interest_rate, status )
+		SELECT * FROM atm.balance_inquiry_off_us_upi(account_number_ , tran_type_,$3);	
+
+	elsif tran_type_ = 'loro' THEN
+		INSERT INTO _bi(account_number, balance, ledger_balance, interest_rate, status )
+		SELECT * FROM atm.balance_inquiry_loro(account_number_ , tran_type_);	
+	END IF;
+
+--select * from atm.balance_inquiry('01-11-00001248', 'on_us')      
+   
+   	RETURN QUERY(SELECT _bi.account_number, _bi.balance, _bi.ledger_balance, _bi.interest_rate, _bi.status FROM _bi );
+   
+
+END
+$BODY$;
+

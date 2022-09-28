@@ -1,0 +1,137 @@
+-- select * from deposit.get_recurring_installments_report(0,'2022-10-10',0)
+
+-- DROP FUNCTION deposit.get_recurring_installments_report(integer,date,integer)
+
+CREATE OR REPLACE FUNCTION deposit.get_recurring_installments_report(
+	office_id_ integer,
+	till_ date,
+	product_id_ integer)
+	RETURNS TABLE(sn bigint, member_id bigint, account_open_date character varying, maturity_date character varying, member_name text, member_address text, account_number character varying, duration_in_days integer, installments integer, installment_amount money, interest_rate double precision, installment_paid bigint, audit_user character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	IF $1 = 0 THEN
+		IF $3 = 0 THEN
+			RETURN QUERY(
+					SELECT ROW_NUMBER() OVER(),
+						a.customer_id,
+						core.date_bs_from_ad(a.account_open_date::date),
+						core.date_bs_from_ad(a.account_open_date::date + a.duration_in_days),
+						c.customer_name,
+						c.permanent_address,
+						a.account_number,
+						a.duration_in_days,
+						a.installments,
+						r.scheduled_payment,
+						a.interest_rate,
+						(SELECT COUNT(i.is_paid) FROM deposit.recurring_installments i WHERE i.is_paid = TRUE AND i.account_number_id = r.account_number_id),
+						u.user_name
+					FROM deposit.recurring_installments r
+					INNER JOIN deposit.account_holders a
+						ON r.account_number_id = a.account_number_id
+					INNER JOIN core.customers_view c
+						ON a.customer_id = c.customer_id
+					INNER JOIN office.users u
+						ON r.audit_user_id = u.user_id
+					WHERE a.account_open_date::date <= $2
+					AND r.status = true
+					GROUP BY a.account_open_date,a.customer_id,c.customer_name,c.permanent_address,r.account_number_id,a.account_number,
+						a.duration_in_days,a.installments,r.scheduled_payment,
+						a.interest_rate,r.is_paid,u.user_name
+			);
+		ELSE
+			RETURN QUERY(
+					SELECT ROW_NUMBER() OVER(),
+						a.customer_id,
+						core.date_bs_from_ad(a.account_open_date::date),
+						core.date_bs_from_ad(a.account_open_date::date + a.duration_in_days),
+						c.customer_name,
+						c.permanent_address,
+						a.account_number,
+						a.duration_in_days,
+						a.installments,
+						r.scheduled_payment,
+						a.interest_rate,
+						(SELECT COUNT(i.is_paid) FROM deposit.recurring_installments i WHERE i.is_paid = TRUE AND i.account_number_id = r.account_number_id),
+						u.user_name
+					FROM deposit.recurring_installments r
+					INNER JOIN deposit.account_holders a
+						ON r.account_number_id = a.account_number_id
+					INNER JOIN core.customers_view c
+						ON a.customer_id = c.customer_id
+					INNER JOIN office.users u
+						ON r.audit_user_id = u.user_id
+					WHERE a.account_open_date::date <= $2
+					AND a.deposit_product_id = $3
+					AND r.status = true
+					GROUP BY a.account_open_date,a.customer_id,c.customer_name,c.permanent_address,r.account_number_id,a.account_number,
+						a.duration_in_days,a.installments,r.scheduled_payment,
+						a.interest_rate,r.is_paid,u.user_name
+			);
+		END IF;
+	ELSE
+		IF $3 = 0 THEN
+			RETURN QUERY(
+				SELECT ROW_NUMBER() OVER(),
+					a.customer_id,
+					core.date_bs_from_ad(a.account_open_date::date),
+					core.date_bs_from_ad(a.account_open_date::date + a.duration_in_days),
+					c.customer_name,
+					c.permanent_address,
+					a.account_number,
+					a.duration_in_days,
+					a.installments,
+					r.scheduled_payment,
+					a.interest_rate,
+					(SELECT COUNT(i.is_paid) FROM deposit.recurring_installments i WHERE i.is_paid = TRUE AND i.account_number_id = r.account_number_id),
+					u.user_name
+				FROM deposit.recurring_installments r
+				INNER JOIN deposit.account_holders a
+					ON r.account_number_id = a.account_number_id
+				INNER JOIN core.customers_view c
+					ON a.customer_id = c.customer_id
+				INNER JOIN office.users u
+					ON r.audit_user_id = u.user_id
+				WHERE a.office_id = $1
+				AND a.account_open_date::date <= $2
+				AND r.status = true
+				GROUP BY a.account_open_date,a.customer_id,c.customer_name,c.permanent_address,r.account_number_id,a.account_number,
+					a.duration_in_days,a.installments,r.scheduled_payment,
+					a.interest_rate,r.is_paid,u.user_name
+			);
+		ELSE
+			RETURN QUERY(
+				SELECT ROW_NUMBER() OVER(),
+					a.customer_id,
+					core.date_bs_from_ad(a.account_open_date::date),
+					core.date_bs_from_ad(a.account_open_date::date + a.duration_in_days),
+					c.customer_name,
+					c.permanent_address,
+					a.account_number,
+					a.duration_in_days,
+					a.installments,
+					r.scheduled_payment,
+					a.interest_rate,
+					(SELECT COUNT(i.is_paid) FROM deposit.recurring_installments i WHERE i.is_paid = TRUE AND i.account_number_id = r.account_number_id),
+					u.user_name
+				FROM deposit.recurring_installments r
+				INNER JOIN deposit.account_holders a
+					ON r.account_number_id = a.account_number_id
+				INNER JOIN core.customers_view c
+					ON a.customer_id = c.customer_id
+				INNER JOIN office.users u
+					ON r.audit_user_id = u.user_id
+				WHERE a.office_id = $1
+				AND a.account_open_date::date <= $2
+				AND a.deposit_product_id = $3
+				AND r.status = true
+				GROUP BY a.account_open_date,a.customer_id,c.customer_name,c.permanent_address,r.account_number_id,a.account_number,
+					a.duration_in_days,a.installments,r.scheduled_payment,
+					a.interest_rate,r.is_paid,u.user_name
+			);
+		END IF;
+	END IF;
+END
+$BODY$;

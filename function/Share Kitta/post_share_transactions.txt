@@ -1,0 +1,27 @@
+
+CREATE OR REPLACE FUNCTION transactions.post_share_transactions(
+	tran_id_ bigint,
+	office_id_ integer,
+	share_account_id_ bigint,
+	kitta_from_ integer,
+	user_id_ integer,
+	trans_type_ character varying)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		
+		INSERT INTO transactions.share_transaction(tran_id,office_id, share_account_id, kitta_no,audit_user_id,trans_type)
+		SELECT $1, $2, $3, $4, $5, $6;
+
+		IF $6 = 'Cr' THEN
+			UPDATE transactions.share_issue_details SET status = false WHERE kitta_no = $4;
+		ELSE
+			UPDATE transactions.share_issue_details SET status = true WHERE kitta_no = $4;
+		END IF;
+
+		RETURN true;
+	END
+$BODY$;

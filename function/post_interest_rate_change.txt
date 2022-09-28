@@ -1,0 +1,36 @@
+-- SELECT * FROM loan.post_interest_rate_change(1, 15958, '14')
+
+-- DROP FUNCTION IF EXISTS loan.post_interest_rate_change(integer, bigint, money);
+
+CREATE OR REPLACE FUNCTION loan.post_interest_rate_change(
+	user_id_ integer,
+	loan_id_ bigint,
+	new_interest_rate_ money)
+	RETURNS TABLE(int_rate_id bigint, value_date date, loan_id bigint, interest_rate numeric, fine_rate numeric, penalty_rate numeric, idiscount_rate numeric, pdiscount_rate numeric, audit_user_id integer, audit_ts timestamp with time zone, old_interest_rate numeric)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE old_ir_ money := (SELECT g.annual_interest_rate FROM loan.loan_grant g WHERE g.loan_id = $2);
+DECLARE _int_rate_id bigint;
+BEGIN
+	INSERT INTO loan.interest_rate_change(value_date, loan_id, interest_rate, fine_rate, penalty_rate, idiscount_rate, pdiscount_rate, audit_user_id, old_interest_rate)
+	SELECT core.get_date(),
+		l.loan_id,
+		$3::numeric,
+		l.interest_fine,
+		l.penalty_rate, 
+		l.i_discount_rate, 
+		l.p_discount_rate, 
+		$1,
+		old_ir_
+	FROM loan.loan_grant l 
+	WHERE l.loan_id = $2;
+	
+	SELECT CURRVAL('loan.interest_rate_change_int_rate_id_seq') INTO _int_rate_id;
+	
+	UPDATE loan.loan_grant g SET annual_interest_rate = $3 WHERE g.loan_id = $2;
+	
+	RETURN QUERY(SELECT * FROM loan.interest_rate_change r WHERE r.int_rate_id = _int_rate_id);
+END
+$BODY$;

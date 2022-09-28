@@ -1,0 +1,145 @@
+-- FUNCTION: deposit.get_closing_balance(integer, date, date, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS deposit.get_closing_balance(integer, date, date, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION deposit.get_closing_balance(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	product_ character varying,
+	unit_ character varying)
+    RETURNS TABLE(sn bigint, open_date date, customer_id bigint, account_number character varying, customer_name text, address text, contact text, gender text, dob character varying, age integer, unit character varying, product character varying, collector character varying, nominee_account character varying, nominee_name text, interest_rate double precision, opening_balance money, debit money, credit money, balance money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE _t(
+	open_date	date,
+	customer_id	bigint,
+	account_number_id bigint,
+	account_number	character varying(50),
+	customer_name	text,
+	address		text,
+	contact		text,
+	gender		text,
+    dob         character varying(20),
+	age         int,
+	unit		character varying(50),
+	product		character varying(150),
+	interest_rate double precision,
+	collector	character varying(150),
+	nominee_account_number character varying,
+	nominee_name text,
+	opening_balance	money,
+	debit		money,
+	credit		money,
+	balance		money
+
+	) ON COMMIT DROP;
+
+	IF office_id_ > 0 THEN
+	INSERT INTO _t(open_date,customer_id, account_number_id, account_number, customer_name, address, contact, gender, unit, product,interest_rate, collector,nominee_account_number, nominee_name, dob)
+	SELECT 
+		ac.account_open_date,
+		ac.customer_id,
+		ac.account_number_id,
+		ac.account_number,
+		c.customer_name,
+		CASE WHEN c.temporary_address = '' THEN c.permanent_address END,
+		c.contact_number,
+		c.gender_name,
+		c.unit_name,
+		p.deposit_product_name,
+		ac.interest_rate,
+		cl.collector_name,
+		n.account_number,
+		nn.customer_name,
+		CASE WHEN c.date_of_birth ='' THEN NULL ELSE core.date_bs_from_ad(left(c.date_of_birth, 19)::date) END
+	FROM deposit.account_holders ac
+	INNER JOIN core.customers_view c
+		ON ac.customer_id = c.customer_id
+	INNER JOIN core.deposit_products p
+		ON ac.deposit_product_id = p.deposit_product_id
+	INNER JOIN office.collectors cl
+		ON ac.collector_id = cl.collector_id
+	LEFT JOIN deposit.account_holders n
+		ON ac.account_number_id = n.interest_nominee_account_number_id
+	LEFT JOIN core.customers_view nn
+		ON n.customer_id = nn.customer_id
+
+	WHERE ac.office_id = $1;
+	ELSE
+	INSERT INTO _t(open_date,customer_id, account_number_id, account_number, customer_name, address, contact, gender, unit, product,interest_rate, collector, nominee_account_number, nominee_name, dob)
+	SELECT 
+		ac.account_open_date,
+		ac.customer_id,
+		ac.account_number_id,
+		ac.account_number,
+		c.customer_name,
+		CASE WHEN c.temporary_address = '' THEN c.permanent_address END,
+		c.contact_number,
+		c.gender_name,
+		c.unit_name,
+		p.deposit_product_name,
+		ac.interest_rate,
+		cl.collector_name,
+		n.account_number ,
+		nn.customer_name,
+		CASE WHEN c.date_of_birth ='' THEN NULL ELSE core.date_bs_from_ad(left(c.date_of_birth, 19)::date) END
+	FROM deposit.account_holders ac
+	INNER JOIN core.customers_view c
+		ON ac.customer_id = c.customer_id
+	INNER JOIN core.deposit_products p
+		ON ac.deposit_product_id = p.deposit_product_id
+	INNER JOIN office.collectors cl
+		ON ac.collector_id = cl.collector_id
+	LEFT JOIN deposit.account_holders n
+		ON ac.account_number_id = n.interest_nominee_account_number_id
+	LEFT JOIN core.customers_view nn
+		ON n.customer_id = nn.customer_id
+		;
+	END IF;
+
+	IF unit_ <> '' THEN
+		DELETE FROM _t WHERE _t.unit <> unit_;
+	END IF;
+	
+	IF product_ <> '' THEN
+		DELETE FROM _t WHERE _t.product <> product_;
+	END IF;
+	
+	UPDATE _t SET opening_balance = op.bal
+	FROM(
+	SELECT a.account_number_id ac, SUM(COALESCE(a.credit,'0')) - SUM(COALESCE(a.debit,'0')) bal
+	FROM deposit.transaction_view a
+	WHERE a.tran_date < from_
+	GROUP BY a.account_number_id
+	)op WHERE _t.account_number_id = op.ac;
+
+	UPDATE _t SET debit = bal.dr, credit = bal.cr
+	FROM (
+		SELECT b.account_number_id ac, SUM(COALESCE(b.debit,'0')) dr, SUM(COALESCE(b.credit,'0')) cr
+		FROM deposit.transaction_view b
+		WHERE tran_date BETWEEN from_ AND to_
+		GROUP BY b.account_number_id
+	) bal WHERE _t.account_number_id = bal.ac;
+
+	UPDATE _t SET balance = COALESCE(_t.opening_balance,'0') + COALESCE(_t.credit,'0') - COALESCE(_t.debit,'0');
+
+	INSERT INTO _t(customer_name, opening_balance, debit, credit, balance) 
+	SELECT '		Total', SUM(COALESCE(_t.opening_balance, '0')), SUM(COALESCE(_t.debit, '0')), SUM(COALESCE(_t.credit, '0')), SUM(COALESCE(_t.balance, '0')) FROM _t;
+	DELETE FROM _t WHERE COALESCE(_t.balance,'0') = '0';
+
+	UPDATE _t SET age = core.get_age(_t.customer_id);
+	--UPDATE _t SET address = (SELECT customer_address FROM core.get_address(_t.customer_id));
+
+	RETURN QUERY(SELECT ROW_NUMBER() OVER (ORDER BY _t.account_number ), _t.open_date, _t.customer_id, _t.account_number, _t.customer_name, _t.address, _t.contact, _t.gender, _t.dob, _t.age, _t.unit,
+			_t.product, _t.collector, _t.nominee_account_number, _t.nominee_name, _t.interest_rate, _t.opening_balance, _t.debit, _t.credit, _t.balance FROM _t ORDER BY _t.account_number);
+END
+$BODY$;
+
+ALTER FUNCTION deposit.get_closing_balance(integer, date, date, character varying, character varying)
+    OWNER TO postgres;

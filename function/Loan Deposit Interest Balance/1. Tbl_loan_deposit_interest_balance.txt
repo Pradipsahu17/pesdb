@@ -1,0 +1,30 @@
+-- Table: core.loan_deposit_interest_balance
+
+-- DROP TABLE IF EXISTS core.loan_deposit_interest_balance;
+
+CREATE TABLE IF NOT EXISTS core.loan_deposit_interest_balance
+(
+    sn bigint,
+    office_id integer,
+    customer_id bigint,
+    name character varying COLLATE pg_catalog."default",
+    address character varying COLLATE pg_catalog."default",
+    contact character varying COLLATE pg_catalog."default",
+    depaccs character varying COLLATE pg_catalog."default",
+    loan_accs character varying COLLATE pg_catalog."default",
+    dep_interest money,
+    loan_interest money,
+    loanbonus money,
+    depbonus money,
+    totalbonus money,
+    tax money,
+    net money,
+    postacc character varying COLLATE pg_catalog."default",
+    share_ac character varying COLLATE pg_catalog."default",
+    share_balance money
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS core.loan_deposit_interest_balance
+    OWNER to postgres;

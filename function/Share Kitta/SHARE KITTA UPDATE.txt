@@ -1,0 +1,9 @@
+SHARE KITTA UPDATE
+alter table transactions.share_issue_details rename column registration_number to  kitta_no;
+
+alter table transactions.share_transaction add column trans_type character varying(50);
+alter table transactions.share_transaction drop column kitta_from;
+alter table transactions.share_transaction drop column kitta_to;
+alter table transactions.share_transaction add column kitta_no character varying(50) REFERENCES transactions.share_issue_details(kitta_no);
+
+alter table transactions.share_issue_details add column status boolean NOT NULL DEFAULT true;

@@ -1,0 +1,87 @@
+-- SELECT * FROM loan.get_bulk_receipt_info_saving(2, '2021-12-12', 20, 0, 0, '')
+
+-- DROP FUNCTION IF EXISTS loan.get_bulk_receipt_info(integer, date, integer, integer, integer, character varying);
+
+CREATE OR REPLACE FUNCTION loan.get_bulk_receipt_info_saving(
+	office_id_ integer,
+	till_ date,
+	limit_ integer,
+	product_id_ integer,
+	unit_id_ integer,
+	payment_type_ character varying)
+    RETURNS TABLE(loan_id bigint, l_account_number character varying, account_number_id bigint, account_number character varying, customer text, col_bal money, due_principal money, due_interest money, curr_interest money, fine money, penalty money, idiscount money, pdiscount money, principal money, rem_interest money, rem_principal money, last_paid character varying, curr_days integer, maturity_date character varying, interest_rate numeric, fine_rate numeric, is_flat boolean, is_auto_payment boolean) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+BEGIN
+	CREATE TEMP TABLE _t(
+	loan_id bigint, l_account_number character varying(50), account_number_id bigint, account_number character varying, customer text, product_id int, unit_id int, col_bal money, due_principal money, due_interest money, curr_interest money, 
+	fine money, penalty money, idiscount money, pdiscount money, principal money, rem_interest money, rem_principal money, last_paid character varying(20), last_paid_ad date, curr_days int, 
+	maturity_date character varying(20), interest_rate numeric(4, 2), fine_rate numeric(4, 2), is_flat boolean, is_auto_payment boolean) ON COMMIT DROP;
+
+	INSERT INTO _t(loan_id, l_account_number, account_number_id, account_number, customer, product_id, unit_id, interest_rate, fine_rate, is_flat, is_auto_payment, col_bal)
+	SELECT a.loan_id, a.loan_account_number,t.account_number_id, d.account_number, cv.customer_name, a.loan_product_id, c.unit_id, a.annual_interest_rate, a.interest_fine, a.is_flat, a.is_auto_payment, 
+		COALESCE(SUM(t.credit), '0') - COALESCE(SUM(t.debit), '0')
+	FROM loan.deposit_transaction_view_unverified t
+	INNER JOIN deposit.account_holders d ON t.account_number_id = d.account_number_id
+	INNER JOIN loan.loan_grant a ON a.auto_payment_deposit_account_id = d.account_number_id
+	INNER JOIN core.customers c ON d.customer_id = c.customer_id
+	INNER JOIN core.customers_view cv ON d.customer_id = cv.customer_id
+	WHERE t.tran_date <= $2 AND t.office_id = $1
+	GROUP BY a.loan_id, a.loan_product_id,t.account_number_id, d.account_number, c.unit_id, a.annual_interest_rate, a.interest_fine, a.is_flat, a.is_auto_payment, a.loan_account_number, cv.customer_name
+	HAVING COALESCE(SUM(t.credit), '0') - COALESCE(SUM(t.debit), '0') > '0';
+
+	UPDATE _t SET due_principal = t.principal FROM (
+		SELECT v.loan_id, SUM(COALESCE(v.issue, '0')) - SUM(COALESCE(v.principal, '0')) principal
+		FROM loan.transaction_view v WHERE v.tran_date <= $2 GROUP BY v.loan_id
+	) t WHERE t.loan_id = _t.loan_id;
+
+	DELETE FROM _t WHERE _t.due_principal = '0';
+
+	IF product_id_ > 0 THEN
+		DELETE FROM _t WHERE _t.product_id <> product_id_; 
+	END IF;
+
+	IF unit_id_ > 0 THEN
+		DELETE FROM _t WHERE _t.unit_id <> unit_id_; 
+	END IF;
+
+	IF UPPER(payment_type_) = 'AUTO' THEN
+		DELETE FROM _t WHERE _t.is_auto_payment = false;
+	ELSIF UPPER(payment_type_) = 'MANUAL' THEN
+		DELETE FROM _t WHERE _t.is_auto_payment = true;
+	END IF;
+
+	DELETE FROM _t WHERE _t.loan_id NOT IN(SELECT _t.loan_id FROM _t LIMIT $3);
+
+	UPDATE _t SET due_interest = '0', 
+		curr_interest = loan.get_current_interest(_t.loan_id, $2),
+		fine = loan.get_current_fine(_t.loan_id, $2),
+		penalty = loan.get_current_penalty(_t.loan_id, $2),
+		idiscount = loan.get_idiscount(_t.loan_id, $2),
+		pdiscount = loan.get_pdiscount(_t.loan_id, $2),
+		last_paid_ad = loan.get_last_payment_date(_t.loan_id, $2),
+		maturity_date = core.date_bs_from_ad(loan.get_maturity_date(_t.loan_id));
+
+    UPDATE _t SET last_paid_ad = a.last_payment_date
+    FROM loan.loan_grant a WHERE _t.loan_id = a.loan_id
+    AND a.last_payment_date IS NOT NULL AND a.loan_id NOT IN (
+        SELECT r.loan_id FROM loan.loan_receipts_view r
+    );
+
+	UPDATE _t SET last_paid = core.date_bs_from_ad(last_paid_ad), curr_days = $2 - _t.last_paid_ad;
+
+	UPDATE _t SET principal = _t.col_bal - (_t.due_interest + _t.curr_interest + _t.fine + _t.penalty - _t.idiscount - _t.pdiscount);
+	UPDATE _t SET rem_interest = _t.principal * (-1) WHERE _t.principal < '0';
+	UPDATE _t SET principal = '0' WHERE _t.principal < '0';
+	UPDATE _t SET rem_principal = _t.due_principal - _t.principal;
+
+	RETURN QUERY (SELECT _t.loan_id, _t.l_account_number, _t.account_number_id, _t.account_number, _t.customer, _t.col_bal, _t.due_principal, _t.due_interest, _t.curr_interest, _t.fine, _t.penalty, _t.idiscount, 
+		_t.pdiscount, _t.principal, _t.rem_interest, _t.rem_principal, _t.last_paid, _t.curr_days, _t.maturity_date, _t.interest_rate, _t.fine_rate, 
+		_t.is_flat, _t.is_auto_payment FROM _t ORDER BY _t.curr_days DESC);
+END
+$BODY$;

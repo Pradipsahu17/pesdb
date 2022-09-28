@@ -1,0 +1,27 @@
+
+CREATE OR REPLACE VIEW core.bank_accounts_view
+ AS
+	SELECT b.bank_account_id,
+		b.office_id,
+		o.office_name,
+		b.gl_account_id,
+		g.account_name,
+		b.bank_name,
+		b.head_office_address,
+		b.branch_name,
+		b.branch_address,
+		b.branch_contact_number,
+		b.relationship_officer_name,
+		b.account_number,
+		b.account_type,
+		b.is_term_deposit,
+		b.interest_rate,
+		b.tax_rate,
+		b.description,
+		b.financial_institution_type_id,
+		b.audit_user_id 
+	FROM core.bank_accounts b
+	INNER JOIN core.gl_accounts g
+		ON b.gl_account_id = g.gl_account_id
+	INNER JOIN office.offices o
+		ON o.office_id = b.office_id;

@@ -1,0 +1,22 @@
+-- select * from office.get_remaining_holidays(1)
+
+CREATE OR REPLACE FUNCTION office.get_remaining_holidays(
+	employee_id_ bigint)
+	RETURNS integer
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _alloted_holidays integer;
+DECLARE _used_holidays integer;
+DECLARE _remaining_holidays integer;
+BEGIN
+	SELECT alloted_holidays FROM office.employee_info WHERE employee_id = $1 INTO _alloted_holidays;
+	
+	SELECT COALESCE(SUM(approved_days),0) FROM office.leave_application WHERE employee_id = $1 INTO _used_holidays;
+	
+	_remaining_holidays := _alloted_holidays - _used_holidays;
+	
+	RETURN _remaining_holidays;
+END
+$BODY$;

@@ -1,0 +1,791 @@
+-- select * from loan.get_loan_receipt_report(0,0,10,'Deposit','2021-01-06','2021-10-10',0)
+
+-- DROP FUNCTION IF EXISTS loan.get_loan_receipt_report(bigint, integer, integer, character varying, date, date);
+
+CREATE OR REPLACE FUNCTION loan.get_loan_receipt_report(
+	loan_id_ bigint,
+	loan_product_id_ integer,
+	collector_id_ integer,
+	debit_ledger_ character varying,
+	from_ date,
+	to_ date,
+	office_id_ integer) 
+	RETURNS TABLE(receipt_id bigint, tran_date character varying,  interest_date character varying,  loan_account_number  character varying, customer_name text,  permanent_address text,debit_ledger character varying, payment money, principal money, interest money, fine money,  penalty money, idiscount money,  pdiscount money, remaining_interest money, days integer, remaining_principal money, collector_name character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		CREATE TEMP TABLE _r(receipt_id bigint) ON COMMIT DROP;
+
+		CREATE TEMP TABLE _t(receipt_id bigint, tran_date character varying,  interest_date character varying,  loan_account_number  character varying, customer_name text,  permanent_address text,debit_ledger character varying, payment money, principal money, interest money, fine money,  penalty money, idiscount money,  pdiscount money, remaining_interest money, days integer, remaining_principal money, collector_name character varying) ON COMMIT DROP;
+		
+		IF $4 = 'Deposit' THEN
+			INSERT INTO _r
+			SELECT loan_receipt_id FROM transactions.transactions WHERE tran_id IN 
+			(SELECT tran_id FROM transactions.transaction_details WHERE account_number_id IS NOT NULL AND coalesce(debit,'0') > '0')
+			AND loan_receipt_id is not null;
+		ELSIF $4 = 'GlAccount' THEN
+			INSERT INTO _r
+			SELECT loan_receipt_id FROM transactions.transactions WHERE tran_id IN 
+			(SELECT tran_id FROM transactions.transaction_details WHERE account_number_id IS NULL AND share_account_id IS NULL AND coalesce(debit,'0') > '0') 
+			AND loan_receipt_id IS NOT null;
+		ELSIF $4 = 'Collection' THEN
+			INSERT INTO _r
+			SELECT loan_receipt_id FROM transactions.transactions WHERE tran_id IN 
+			(SELECT tran_id FROM transactions.transaction_details WHERE account_number_id IS NULL AND share_account_id IS NULL AND loan_receipt_type <> 'Principal' AND coalesce(debit,'0') > '0')			 
+			AND loan_receipt_id IS NOT null	;
+		END IF;
+		
+		IF $4 = 'All' THEN
+			IF $1 = 0 THEN
+				IF $2 = 0 THEN
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.office_id = $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				ELSE
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				END IF;
+			ELSE
+				IF $2 = 0 THEN
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				ELSE
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				END IF;
+			END IF;
+		ELSE
+			IF $1 = 0 THEN
+				IF $2 = 0 THEN
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				ELSE
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_collection = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				END IF;
+			ELSE
+				IF $2 = 0 THEN
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				ELSE
+					IF $3 = 0 THEN
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					ELSE
+						IF $7 = 0 THEN
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						ELSE
+							INSERT INTO _t
+							SELECT t.receipt_id, core.date_bs_from_ad(t.tran_date), 
+								core.date_bs_from_ad(t.interest_date), 
+								l.loan_account_number, c.customer_name, 
+								c.permanent_address, loan.get_debit_ledger(t.receipt_id), t.payment,
+								t.principal, t.interest, t.fine, 
+								t.penalty, t.idiscount, 
+								t.pdiscount, t.remaining_interest, t.days, t.remaining_principal, co.collector_name
+							FROM loan.loan_receipts_view t
+							INNER JOIN _r ON t.receipt_id = _r.receipt_id
+							INNER JOIN loan.loan_grant l ON t.loan_id = l.loan_id 
+							INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+							INNER JOIN office.collectors co ON co.collector_id = l.collector_id
+							WHERE t.tran_date BETWEEN $5 AND $6
+							AND l.loan_id = $1
+							AND l.loan_product_id = $2
+							AND l.collector_id = $3
+							AND l.office_id= $7;
+
+							INSERT INTO _t(debit_ledger,payment, principal, interest, fine, penalty, idiscount, pdiscount, remaining_interest)
+							SELECT 'Total',SUM(_t.payment), SUM(_t.principal), SUM(_t.interest), SUM(_t.fine), SUM(_t.penalty), SUM(_t.idiscount), SUM(_t.pdiscount), SUM(_t.remaining_interest) FROM _t;
+
+							RETURN QUERY (SELECT * FROM _t);
+						END IF;
+					END IF;
+				END IF;
+			END IF;
+		END IF;
+	END
+$BODY$;

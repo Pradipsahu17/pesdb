@@ -1,0 +1,28 @@
+-- Table: core.posting_product_order
+
+-- DROP TABLE IF EXISTS core.posting_product_order;
+
+CREATE TABLE IF NOT EXISTS core.posting_product_order
+(
+    order_id serial NOT NULL,
+    deposit_product_id integer NOT NULL,
+    product_name character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT share_dividend_posting_product_order_pkey PRIMARY KEY (order_id),
+    CONSTRAINT share_dividend_posting_product_order_deposit_product_id_fkey FOREIGN KEY (deposit_product_id)
+        REFERENCES core.deposit_products (deposit_product_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS core.posting_product_order
+    OWNER to postgres;
+-- Index: deposit_product_id_ix
+
+-- DROP INDEX IF EXISTS core.deposit_product_id_ix;
+
+CREATE INDEX IF NOT EXISTS deposit_product_id_ix
+    ON core.posting_product_order USING btree
+    (deposit_product_id ASC NULLS LAST)
+    TABLESPACE pg_default;

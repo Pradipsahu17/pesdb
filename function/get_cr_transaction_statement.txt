@@ -1,0 +1,20 @@
+CREATE OR REPLACE FUNCTION deposit.get_cr_transaction_statement(
+	tran_id_ bigint)
+	RETURNS TABLE(tran_id bigint, balance money, credit money, statement_reference character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT td.tran_id,
+				deposit.get_balance(a.account_number),
+				td.credit,
+				td.statement_reference
+            FROM transactions.transaction_details AS td
+            INNER JOIN deposit.account_holders a ON td.account_number_id = a.account_number_id
+			WHERE td.tran_id = $1
+			AND td.account_number_id IS NOT NULL
+		);
+	END
+$BODY$;

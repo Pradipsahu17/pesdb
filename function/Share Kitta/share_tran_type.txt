@@ -1,0 +1,12 @@
+-- DROP TYPE IF EXISTS transactions.share_tran_type;
+
+CREATE TYPE transactions.share_tran_type AS
+(
+	tran_id bigint,
+	share_account_id bigint,
+	kitta_from integer,
+	kitta_to integer,
+	audit_user_id integer,
+	office_id integer,
+	trans_type character varying
+);

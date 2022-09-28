@@ -1,0 +1,16 @@
+CREATE OR REPLACE FUNCTION loan.insert_into_loan_application_comments(
+ 	application_id_ bigint,
+ 	user_id_ integer,
+ 	comment_ character varying)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		INSERT INTO loan.loan_application_comments(application_id,commented_by,comment) Values
+ 		($1,$2,$3);
+		
+		RETURN true;
+	END
+$BODY$;

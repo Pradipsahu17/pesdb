@@ -1,0 +1,30 @@
+-- SELECT * FROM transactions.rejected_transactions_voucher_from_tran_id(57, 'test', 'test', 'test', 1)
+
+CREATE OR REPLACE FUNCTION transactions.reject_voucher_from_tran_id(
+	tran_id_ bigint,
+	requested_by_ character varying,
+	statement_reference_ character varying,
+	modified_by_ character varying,
+	user_id_ integer)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _ibt_tran_id bigint;
+BEGIN
+    SELECT ibt_tran_id FROM transactions.transactions INTO _ibt_tran_id WHERE tran_id = $1;
+	
+	IF _ibt_tran_id IS NOT NULL THEN
+	
+	UPDATE transactions.transactions SET verification_status_id=-3 WHERE ibt_tran_id=_ibt_tran_id;
+	ELSE
+	UPDATE transactions.transactions SET verification_status_id=-3 WHERE tran_id=$1;
+	END IF;
+	
+	INSERT INTO transactions.rejected_transactions(tran_id, requested_by, statement_reference, modified_by, audit_user_id)
+	SELECT $1, $2, $3, $4, $5;
+	
+	RETURN true;
+END
+$BODY$;

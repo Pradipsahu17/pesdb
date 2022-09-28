@@ -1,0 +1,20 @@
+-- 	select * from transactions.get_debit_kitta_no(22125,6)
+
+-- 	DROP FUNCTION transactions.get_debit_kitta_no(bigint,integer)
+
+CREATE OR REPLACE FUNCTION transactions.get_debit_kitta_no(
+	share_account_id_ bigint,
+	total_kitta_ integer)
+	RETURNS TABLE(kitta_from integer, kitta_to integer)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT min(kitta_no), min(kitta_no) + $2 - 1
+			FROM transactions.share_transaction s
+			WHERE s.share_account_id = $1
+		);
+	END
+$BODY$;

@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS office.leave_application(
+	leave_application_id bigserial PRIMARY KEY UNIQUE NOT NULL,
+	application_date date NOT NULL,
+	employee_id bigint REFERENCES office.employee_info(employee_id) NOT NULL,
+	leave_type_id integer REFERENCES office.leave_type(leave_type_id) NOT NULL,
+	demanded_days integer NOT NULL,
+	approved_days integer,
+	notes character varying(500),
+	verification_status_id integer NOT NULL DEFAULT 0,
+	verified_by integer,
+	verification_note character varying,
+	verified_date date,
+	audit_user_id integer REFERENCES office.users(user_id),
+	audit_ts timestamp with time zone NOT NULL DEFAULT now()
+);

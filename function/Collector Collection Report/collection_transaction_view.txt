@@ -1,0 +1,27 @@
+-- select * from deposit.collection_transaction_view
+
+-- DROP VIEW deposit.collection_transaction_view;
+
+CREATE OR REPLACE VIEW deposit.collection_transaction_view
+ AS
+ SELECT t.tran_id,
+    a.office_id,
+    t.tran_date,
+    p.deposit_product_name,
+    p.is_recurring_deposit,
+    COALESCE(t.collector_id, 0) AS collector_id,
+    td.account_number_id,
+    COALESCE(td.slip_number::text, ''::text) || COALESCE(td.check_number::text, ''::text) AS check_number,
+    td.statement_reference,
+    td.credit,
+	td.debit,
+    t.audit_user_id AS user_id
+   FROM transactions.transactions t
+     JOIN transactions.transaction_details td ON t.tran_id = td.tran_id
+     JOIN deposit.account_holders a ON td.account_number_id = a.account_number_id
+     JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+     JOIN office.collectors o ON t.collector_id = o.collector_id
+  WHERE t.verification_status_id > 0 
+  AND td.account_number_id IS NOT NULL 
+  AND t.book_name::text <> 'Deposit Interest Transit'::text
+  AND o.collector_name::text <> 'Office'::text;

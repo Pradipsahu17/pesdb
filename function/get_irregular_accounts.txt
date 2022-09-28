@@ -1,0 +1,56 @@
+-- select * from deposit.get_irregular_accounts(2,75,47,'2021-10-10','2021-11-11','1000')
+
+-- DROP FUNCTION IF EXISTS deposit.get_irregular_accounts(integer, integer, integer, date, date, money);
+
+CREATE OR REPLACE FUNCTION deposit.get_irregular_accounts(
+	office_id_ integer,
+	deposit_product_id_from_ integer,
+	deposit_product_id_to_ integer,
+	from_ date,
+	to_ date,
+	amount money)
+    RETURNS TABLE(customer_id bigint, member_name text, from_acc bigint, from_acc_no character varying, from_balance money, sn bigint, to_acc bigint, to_acc_no character varying, to_balance money, credit money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE _t(
+		customer_id bigint, 
+		member_name text,
+		from_acc bigint,
+		from_acc_no character varying, 
+		from_balance money,
+		to_acc bigint,
+		to_acc_no character varying,
+		to_balance money,
+		credit money
+	) ON COMMIT DROP;
+
+	INSERT INTO _t(customer_id, member_name,from_acc,from_acc_no, from_balance, to_acc, to_acc_no, to_balance, credit)
+	SELECT * FROM (SELECT a.customer_id,
+		c.customer_name,
+		(SELECT COALESCE(MAX(ac.account_number_id), null) FROM deposit.account_holders ac where ac.customer_id = a.customer_id and ac.deposit_product_id = $3),
+		(SELECT COALESCE(MAX(ac.account_number), null) FROM deposit.account_holders ac where ac.customer_id = a.customer_id and ac.deposit_product_id = $3),
+		deposit.get_drawing_power((SELECT COALESCE(MAX(ac.account_number_id), null) FROM deposit.account_holders ac where ac.customer_id = a.customer_id and ac.deposit_product_id = $3)),
+		a.account_number_id,
+		a.account_number,
+		deposit.get_drawing_power(a.account_number_id),SUM(td.credit) AS credit
+	FROM deposit.account_holders a
+	INNER JOIN transactions.transaction_details td
+		ON td.account_number_id = a.account_number_id
+	INNER JOIN transactions.transactions t
+		ON td.tran_id = t.tran_id
+	INNER JOIN core.customers_view c
+		ON a.customer_id = c.customer_id
+	WHERE a.deposit_product_id = $2
+	AND a.office_id = $1
+	AND a.status = true
+	AND t.tran_date BETWEEN $4 AND $5
+	GROUP BY a.account_number_id,a.office_id,a.customer_id,c.customer_name)t where t.credit < $6::money;
+	
+	RETURN QUERY(SELECT _t.customer_id,_t.member_name,_t.from_acc,_t.from_acc_no,_t.from_balance,ROW_NUMBER() OVER (ORDER BY _t.customer_id),_t.to_acc,_t.to_acc_no,_t.to_balance,_t.credit FROM _t);
+END
+$BODY$;

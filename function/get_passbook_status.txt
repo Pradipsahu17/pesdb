@@ -1,0 +1,26 @@
+CREATE OR REPLACE FUNCTION deposit.get_passbook_status(
+	from_ date,
+	to_ date)
+	RETURNS TABLE(account_no_id bigint, customer_id bigint, account_open_date timestamp without time zone, account_number character varying, customer_name text, customer_address text, pb_status boolean)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT a.account_number_id,
+					a.customer_id,
+					a.account_open_date,
+					a.account_number,
+					c.customer_name,
+					g.customer_address,
+					a.is_pb_provided
+			FROM deposit.account_holders a 
+			INNER JOIN core.customers_view c 
+				ON a.customer_id = c.customer_id
+			INNER JOIN core.get_address(c.customer_id) g
+				ON a.customer_id = g.customer_id 
+			WHERE a.account_open_date BETWEEN $1 AND $2
+		);
+	END
+$BODY$;

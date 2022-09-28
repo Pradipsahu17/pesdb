@@ -1,0 +1,147 @@
+-- SELECT * FROM deposit.get_genderwise_member_accounts(1,'2020-10-10','2022-10-10')
+ 
+-- DROP FUNCTION deposit.get_genderwise_member_accounts(integer,date,date,integer)
+	
+CREATE OR REPLACE FUNCTION deposit.get_genderwise_member_accounts(
+	office_id_ integer,
+	from_ date,
+	to_ date)
+	RETURNS TABLE(sn bigint, office_id integer, member_id bigint, member_name text, member_address text, gender text, last_tran_date character varying, days integer, balance money, no_of_deposit bigint, no_of_withdrawl bigint, average_deposit numeric, total_deposit_amount money, total_withdrawl_amount money, share_amount money, loan_amount money, total_no_of_active_acc integer)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _date date := (SELECT core.get_date());
+	BEGIN
+		CREATE TEMP TABLE _t(
+				office_id integer,
+				member_id bigint, 
+				member_name text, 
+				member_address text, 
+				gender text,
+				last_tran_date character varying,
+				last_tran_date_ad date,
+				days integer, 
+				balance money, 
+				no_of_deposit bigint, 
+				no_of_withdrawl bigint, 
+				average_deposit numeric, 
+				total_deposit_amount money, 
+				total_withdrawl_amount money,
+				share_amount money,
+				loan_amount money,
+				total_no_of_active_acc integer
+			) ON COMMIT DROP;
+	
+			IF $1 = 0 THEN
+				INSERT INTO _t(office_id, member_id, member_name, member_address, gender, last_tran_date, days, balance, no_of_deposit, no_of_withdrawl, average_deposit, total_deposit_amount, total_withdrawl_amount, share_amount, loan_amount, total_no_of_active_acc)
+				SELECT a.office_id,
+					a.customer_id, 
+					c.customer_name, 
+					c.permanent_address, 
+					c.gender_name,
+					'', 0, '0', 0, 0, 0, '0', '0', '0', '0', 0
+				FROM deposit.account_holders a
+				INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+				INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+				WHERE a.status = true
+				GROUP BY a.customer_id, a.office_id, a.customer_id,  c.customer_name,  c.permanent_address,  c.gender_name
+				ORDER BY a.customer_id;
+			ELSE
+				INSERT INTO _t(office_id, member_id, member_name, member_address, gender, last_tran_date, days, balance, no_of_deposit, no_of_withdrawl, average_deposit, total_deposit_amount, total_withdrawl_amount, share_amount, loan_amount, total_no_of_active_acc)
+				SELECT a.office_id,
+					a.customer_id, 
+					c.customer_name, 
+					c.permanent_address, 
+					c.gender_name,
+					'', 0, '0', 0, 0, 0, '0', '0', '0', '0', 0
+				FROM deposit.account_holders a
+				INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+				INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+				WHERE a.status = true
+				AND a.office_id = $1
+				GROUP BY a.customer_id, a.office_id, a.customer_id,  c.customer_name,  c.permanent_address,  c.gender_name
+				ORDER BY a.customer_id;
+			END IF;
+			
+		--UPDATE PART	
+		
+			--  FOR last_tran_date
+			UPDATE _t SET last_tran_date_ad = r.last_tran_date FROM
+			(SELECT MAX(t.tran_date::date) AS last_tran_date, a.customer_id FROM deposit.transaction_view t
+			INNER JOIN deposit.account_holders a ON a.account_number_id = t.account_number_id
+			WHERE t.tran_date::date BETWEEN $2 AND $3 GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			--  FOR days
+			UPDATE _t SET days = r.days FROM
+			(SELECT _date - MAX(t.tran_date::date) AS days, a.customer_id FROM deposit.transaction_view t
+			INNER JOIN deposit.account_holders a ON a.account_number_id = t.account_number_id GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			--  FOR balance
+			UPDATE _t SET balance = r.balance FROM
+			(SELECT sum(t.credit) - sum(t.debit) AS balance, a.customer_id FROM _t
+			INNER JOIN deposit.account_holders a ON _t.member_id = a.customer_id 
+			INNER JOIN deposit.transaction_view t ON a.account_number_id = t.account_number_id
+			WHERE t.tran_date::date <= $3 GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			--  FOR no_of_deposit and average_deposit
+			UPDATE _t SET no_of_deposit = r.no_of_deposit, average_deposit = r.average_deposit FROM
+			(SELECT COUNT(*) AS no_of_deposit, AVG(t.credit::numeric)::numeric(20,2) average_deposit, a.customer_id FROM transactions.deposit_transaction_view t
+			INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id 
+			WHERE t.credit > '0' AND t.tran_date::date BETWEEN $2 AND $3 GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			--  FOR no_of_withdrawl
+			UPDATE _t SET no_of_withdrawl = r.no_of_withdrawl FROM
+			(SELECT COUNT(*) AS no_of_withdrawl, a.customer_id  FROM transactions.deposit_transaction_view t
+			INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id 
+			WHERE t.debit > '0' AND t.tran_date::date BETWEEN $2 AND $3 GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			--  FOR total_deposit_amount
+			UPDATE _t SET total_deposit_amount = r.total_deposit_amount FROM
+			(SELECT SUM(t.credit) as total_deposit_amount, a.customer_id FROM transactions.deposit_transaction_view t
+			INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id
+			WHERE t.credit > '0' AND t.tran_date::date BETWEEN $2 AND $3 GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			--  FOR total_withdrawl_amount
+			UPDATE _t SET total_withdrawl_amount = r.total_withdrawl_amount FROM
+			(SELECT SUM(t.debit) AS total_withdrawl_amount, a.customer_id FROM transactions.deposit_transaction_view t
+			INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id
+			WHERE t.debit > '0' AND t.tran_date::date BETWEEN $2 AND $3 GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			--  FOR loan_amount
+			UPDATE _t SET loan_amount = r.loan_amount FROM
+			(SELECT SUM(COALESCE(p.debit,'0')) - SUM(COALESCE(p.credit,'0')) AS loan_amount, _t.member_id  FROM _t
+			INNER JOIN loan.loan_grant l ON _t.member_id = l.customer_id
+			INNER JOIN loan.principal_transaction_view p ON l.loan_id = p.loan_id 
+			WHERE p.tran_date::date <= $3 GROUP BY _t.member_id)r 
+			WHERE _t.member_id = r.member_id;  -- select * from loan.principal_transaction_view where credit > '0'
+		
+			--  FOR share_amount
+			UPDATE _t SET share_amount = r.share_amount FROM
+			(SELECT SUM(COALESCE(t.credit,'0')) - SUM(COALESCE(t.debit,'0')) AS share_amount, _t.member_id FROM _t
+			INNER JOIN core.share_accounts s ON _t.member_id = s.customer_id
+			INNER JOIN core.share_transaction_view t ON s.share_account_id = t.share_account_id
+			WHERE t.tran_date::date <= $3 GROUP BY _t.member_id)r 
+			WHERE _t.member_id = r.member_id;
+		
+			--  FOR total_no_of_active_acc
+			UPDATE _t SET total_no_of_active_acc = r.total_no_of_active_acc FROM
+			(SELECT COUNT(*) AS total_no_of_active_acc, a.customer_id FROM deposit.account_holders a
+			WHERE a.status = true GROUP BY a.customer_id)r 
+			WHERE _t.member_id = r.customer_id;
+			
+			-- Update ad to bs
+			UPDATE _t SET last_tran_date = d.date_in_bs
+			 FROM core.date_conversion d 
+			 WHERE last_tran_date_ad = d.date_in_ad;
+			
+		RETURN QUERY(SELECT ROW_NUMBER() OVER(ORDER BY _t.member_id),_t.office_id, _t.member_id, _t.member_name, _t.member_address, _t.gender, _t.last_tran_date, _t.days, _t.balance, _t.no_of_deposit, _t.no_of_withdrawl, _t.average_deposit, _t.total_deposit_amount, _t.total_withdrawl_amount, _t.share_amount, _t.loan_amount,_t.total_no_of_active_acc FROM _t ORDER BY _t.member_id);
+	END
+$BODY$;

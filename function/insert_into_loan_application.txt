@@ -1,0 +1,33 @@
+CREATE OR REPLACE FUNCTION loan.insert_into_loan_application(
+	office_id_ integer,
+	customer_id_ bigint,
+	user_id_ integer, 
+	loan_product_id_ integer, 
+	application_date_ date, 
+	loan_demand_amount_ money, 
+	approved_amount_ money, 
+	annual_interest_rate_ money, 
+	interest_fine_ money,
+	penalty_rate_ double precision,
+	i_discount_rate_ money, 
+	p_discount_rate_ money, 
+	interest_installment_ integer, 
+	principal_installment_ integer, 
+	collector_id_ integer, 
+	notes_ character varying,
+	verified_by_ integer, 
+	verified_date_ date)
+	RETURNS bigint	
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _tran_id bigint;
+BEGIN
+	INSERT INTO loan.loan_application(office_id,customer_id,audit_user_id, loan_product_id, application_id, loan_demand_amount, approved_amount, annual_interest_rate, interest_fine,penalty_rate,i_discount_rate, p_discount_rate, interest_installmentL, principal_installment, collector_id, notes, verified_by, verified_date)
+	SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18;
+	
+	SELECT currval('transactions.transactions_tran_id_seq') INTO _tran_id;
+	RETURN _tran_id;
+END
+$BODY$;

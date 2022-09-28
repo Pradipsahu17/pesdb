@@ -1,0 +1,260 @@
+-- select * from loan.get_sectorwise_report_summery(2, '2021-10-10', 1)
+
+-- DROP FUNCTION IF EXISTS loan.get_sectorwise_report_summery(integer, date, integer);
+
+CREATE OR REPLACE FUNCTION loan.get_sectorwise_report_summery(
+	office_id_ integer,
+	till_ date,
+	sector_id_ integer)
+    RETURNS TABLE(sn bigint, sector_name character varying, total_lin money, total_account integer, due_loan money, due_loan_holders integer, due_loan_percent money, total_due_interest money, total_due_percent money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+--SELECT * FROM loan.transaction_view limit 19
+
+		DECLARE _total_loan numeric ;
+
+BEGIN
+	CREATE TEMP TABLE _t( sn bigint,office_id int,member_id bigint,loan_id bigint, account_number character varying, sector_id int, sector_name character varying, member_name text, issue_date date, issue_date_np character varying(10),  renew_date date, renew_date_np character varying(10),min_schedule_date date, mat_date_ad date, maturity_date character varying, missing_schedule_date_ad date,missing_schedule_date character varying(10), loan_duration int, installments	int, inst_duration int, curr_duration int, inst_amount money, issue money, total_forward money, inst_receivable money,inst_received money, received money, 
+	inst_due money, over_payment money, no_of_payment int, avg_payment money, mat_int money, receive_int money,int_due money,principal_due money, is_scheduled boolean not null default(false), last_tran_date date, int_rate numeric,tran_duration int) ON COMMIT DROP;
+
+	IF sector_id_ = 0 AND office_id_ = 0 THEN
+		INSERT INTO _t(office_id,member_id,loan_id, account_number, sector_id, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, receive_int,last_tran_date, int_rate)
+		SELECT a.office_id,a.customer_id,a.loan_id, a.loan_account_number, a.investment_sector_id, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($2 - a.issue_date::date)::int, 
+			SUM(COALESCE(t.issue, '0')), SUM(COALESCE(t.principal, '0')), SUM(COALESCE(t.interest, '0')), MAX(tran_date), a.annual_interest_rate
+		FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+		WHERE a.is_dead = false  AND t.tran_date <= $2 GROUP by a.loan_id, a.issue_date;
+		
+	ELSE IF sector_id_ = 0 AND office_id_ > 0 THEN
+	
+		INSERT INTO _t(office_id,member_id,loan_id, account_number, sector_id, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, receive_int,last_tran_date, int_rate)
+		SELECT a.office_id,a.customer_id,a.loan_id, a.loan_account_number, a.investment_sector_id, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($2 - a.issue_date::date)::int, 
+			SUM(COALESCE(t.issue, '0')), SUM(COALESCE(t.principal, '0')), SUM(COALESCE(t.interest, '0')), MAX(tran_date), a.annual_interest_rate
+		FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+		WHERE a.is_dead = false AND a.office_id = $1 AND t.tran_date <= $2 GROUP by a.loan_id, a.issue_date;
+	
+--select * from loan.get_sectorwise_detail_report(1,'2022-04-10',false, 16)
+	
+	ELSE
+	
+		INSERT INTO _t(office_id,member_id,loan_id,  account_number,sector_id, issue_date, loan_duration, installments, inst_duration, curr_duration, issue, received, receive_int, last_tran_date, int_rate)
+		SELECT a.office_id,a.customer_id, a.loan_id, a.loan_account_number, a.investment_sector_id, a.issue_date::date, a.loan_duration, COALESCE(a.principal_installment, 1), COALESCE(a.loan_duration, 0) / COALESCE(a.principal_installment, 0), ($2 - a.issue_date::date)::int, 
+			SUM(COALESCE(t.issue, '0')), SUM(COALESCE(t.principal, '0')), SUM(COALESCE(t.interest, '0')),MAX(tran_date), a.annual_interest_rate
+		FROM loan.loan_grant a INNER JOIN loan.transaction_view t ON a.loan_id = t.loan_id
+		WHERE a.is_dead = false AND a.office_id = $1 AND t.tran_date <= $2 AND a.investment_sector_id = sector_id_ 
+		GROUP by a.loan_id, a.loan_account_number,a.issue_date;
+	END IF;
+	END IF;
+	
+ 	UPDATE _t SET principal_due = COALESCE(_t.issue, '0') - COALESCE(_t.received, '0');
+ 	DELETE FROM _t WHERE _t.principal_due = '0';
+	
+	
+	--select * from loan.get_installment_report(0,'2022-04-09',0,false, false)
+	--UPDATE _t SET received='0';
+	
+	UPDATE _t SET renew_date =r.rdate
+	FROM (SELECT MAX(tran_date)rdate, v.loan_id from loan.loan_reimburse_view v WHERE tran_date<=$2
+	GROUP by v.loan_id, tran_date)r
+	WHERE _t.loan_id = r.loan_id;
+	
+	UPDATE _t SET inst_amount =s.s_amount
+	FROM (SELECT avg(principal_deduction::numeric)::money s_amount, r.loan_id 
+		  from loan.loan_repayment_schedule r
+	where status=true
+	group by r.loan_id)s
+	where _t.loan_id = s.loan_id;
+
+	UPDATE _t SET is_scheduled=true
+	FROM loan.loan_repayment_schedule r
+	WHERE _t.loan_id = r.loan_id;
+
+	UPDATE _t SET inst_receivable =	s.s_amount, min_schedule_date = s.sdate
+	FROM (SELECT min(schedule_date)sdate, SUM(COALESCE(principal_deduction,'0')) s_amount, r.loan_id from loan.loan_repayment_schedule r
+	where status=true AND schedule_date<= $2
+	group by r.loan_id)s
+	where _t.loan_id = s.loan_id;
+
+--select * from loan.get_installment_report(0,'2022-04-10',0,false, false)
+
+	UPDATE _t SET installments=i.inst
+	FROM(SELECT r.loan_id,COUNT(*)inst FROM loan.loan_repayment_schedule r WHERE status=true
+		AND principal_deduction>'0' GROUP BY r.loan_id) i
+	WHERE _t.loan_id = i.loan_id;
+
+	UPDATE _t SET mat_date_ad=r.value_date + r.days_to_add, total_forward = r.total_forward
+	FROM loan.loan_reimburse_view_detail r
+	WHERE _t.loan_id=r.loan_id
+	AND r.status=true;
+	
+	UPDATE _t SET mat_date_ad=a.issue_date::date + a.loan_duration
+	FROM loan.loan_grant a
+	WHERE a.loan_id=_t.loan_id
+	AND _t.mat_date_ad IS NULL;
+	
+	UPDATE _t SET loan_duration = mat_date_ad - _t.issue_date;
+	
+	
+	--UPDATE _t SET  inst_received = loan.get_principal_received_between(_t.loan_id, _t.renew_date, $2);
+	--raise notice 'paid %', inst_received from _t;
+	UPDATE _t SET  inst_received=r.pr, received=r.pr
+	FROM (SELECT  v.loan_id, SUM(principal)pr  from loan.transaction_view v
+	INNER JOIN _t ON v.loan_id = _t.loan_id	  
+	where v.tran_date BETWEEN _t.renew_date AND  $2 --and _t.renew_date is not null 
+	  group by v.loan_id) r
+	 WHERE _t.loan_id = r.loan_id;
+	 
+	 UPDATE _t SET  inst_received=r.pr
+	FROM (SELECT v.loan_id , SUM(principal)pr from loan.transaction_view v
+	 INNER JOIN _t ON v.loan_id = _t.loan_id	 
+	where tran_date   <$2 and _t.min_schedule_date< _t.renew_date 
+	 and v.loan_id = _t.loan_id group by v.loan_id)r
+	 WHERE _t.loan_id = r.loan_id;
+	 
+
+--select * from loan.get_installment_report(0,'2022-04-10',0,false, false)
+
+ 	UPDATE _t SET inst_amount = (COALESCE(_t.issue, '0') / _t.installments::money)::numeric::money 
+	WHERE is_scheduled = false;
+	
+ 	UPDATE _t SET inst_receivable = (_t.curr_duration / _t.inst_duration) * _t.inst_amount 
+	WHERE _t.curr_duration <= _t.loan_duration and  _t.inst_amount ='0' AND _t.installments>1
+	AND is_scheduled=false;
+ 	
+
+	--select '2018-04-24'::date + 1461
+	
+	
+
+	UPDATE _t SET inst_receivable = _t.issue 
+	WHERE _t.curr_duration > _t.loan_duration;
+
+ 	UPDATE _t SET inst_due = _t.inst_receivable - _t.inst_received WHERE _t.inst_receivable > _t.inst_received;
+ 	UPDATE _t SET over_payment = _t.received - _t.inst_receivable WHERE _t.inst_receivable < _t.inst_received;
+
+--new added
+ 	UPDATE _t SET inst_due = _t.inst_receivable - _t.received WHERE _t.inst_receivable > _t.received AND _t.inst_due is null;
+ 	UPDATE _t SET over_payment = _t.received - _t.inst_receivable WHERE _t.inst_receivable < _t.received AND _t.inst_due is null;
+
+	UPDATE _t SET no_of_payment = t.nop FROM (
+	SELECT v.loan_id, COUNT(*) nop
+	FROM loan.principal_transaction_view v WHERE v.tran_date <= $2 AND COALESCE(v.credit, '0') > '0'
+	GROUP BY v.loan_id) t WHERE _t.loan_id = t.loan_id;
+ 	UPDATE _t SET avg_payment = _t.received / COALESCE(_t.no_of_payment, 1);
+
+ 	--UPDATE _t SET principal_due = COALESCE(_t.issue, '0') - COALESCE(_t.received, '0');
+ 	
+	
+--select * from loan.get_installment_report(0,'2022-04-10',0,false, false)
+
+	UPDATE _t SET missing_schedule_date_ad=(SELECT MIN(r.schedule_date) FROM loan.loan_repayment_schedule r
+	where r.loan_id=_t.loan_id and ending_balance<_t.principal_due AND schedule_date<=till_);
+	
+	UPDATE _t SET missing_schedule_date_ad =(
+	SELECT MAX(task_date) from core.financial_information where task_date<=till_
+	)
+	 WHERE COALESCE(_t.inst_due, '0') > '0' AND missing_schedule_date_ad IS NULL ;
+	
+
+ 	INSERT INTO _t( missing_schedule_date,issue, inst_receivable, received, inst_due, over_payment, principal_due) 
+ 	SELECT ' Total',SUM(COALESCE(_t.issue,'0')), SUM(COALESCE(_t.inst_receivable,'0')), SUM(COALESCE(_t.received,'0')), SUM(COALESCE(_t.inst_due,'0')), 
+ 	SUM(COALESCE(_t.over_payment,'0')), SUM(COALESCE(_t.principal_due,'0')) FROM _t;
+	
+
+	UPDATE _t SET maturity_date=d.date_in_bs
+	FROM core.date_conversion d
+	WHERE _t.mat_date_ad=d.date_in_ad;
+	
+	UPDATE _t SET renew_date_np=d.date_in_bs
+	FROM core.date_conversion d
+	WHERE _t.renew_date=d.date_in_ad;
+	
+	UPDATE _t SET issue_date_np=d.date_in_bs
+	FROM core.date_conversion d
+	WHERE _t.issue_date=d.date_in_ad;
+	
+	
+	UPDATE _t SET missing_schedule_date=d.date_in_bs
+	FROM core.date_conversion d
+	WHERE _t.missing_schedule_date_ad=d.date_in_ad;
+	
+	
+	
+	UPDATE _t SET account_number= v.loan_account_number, member_name = v.customer_name
+	FROM loan.accounts_view v
+	WHERE _t.loan_id = v.loan_id;
+	
+---int update
+
+	
+	UPDATE _t SET tran_duration = $2-last_tran_date;
+	
+-- 	UPDATE _t SET mat_int = r.intr
+-- 	FROM(SELECT v.loan_id, SUM(v.interest) intr FROM loan.interest_transit v
+-- 		 INNER JOIN _t ON v.loan_id = _t.loan_id GROUP BY v.loan_id)r
+-- 	WHERE _t.loan_id = r.loan_id;
+	
+		UPDATE _t SET mat_int = ((_t.principal_due*(_t.int_rate/100))/365)*_t.tran_duration;
+	
+
+-- UPDATE _t SET mat_int = g.interest_due + _t.mat_int
+-- 	FROM loan.loan_grant g
+-- 	WHERE _t.loan_id = g.loan_id;
+
+	UPDATE _t SET int_due = _t.mat_int ;
+	
+	UPDATE _t SET int_due =ROUND(_t.int_due::NUMERIC,0)::MONEY;
+
+	UPDATE _t SET sector_name = s.investment_sector_name
+	FROM loan.investment_sectors s
+	WHERE  _t.sector_id=s.investment_sector_id ;
+	
+				CREATE TEMP TABLE _l(
+				sector_id int,
+				sector_name character varying,
+				total_lin money,
+				total_account int,
+				due_loan money, due_loan_holders int, due_loan_percent money, total_due_interest money, total_due_percent money) ON COMMIT DROP;
+
+INSERT INTO _l( sector_id, sector_name)
+ SELECT s.investment_sector_id, s.investment_sector_name  FROM  loan.investment_sectors s;
+ 
+UPDATE _l SET  total_lin= r.lin, total_account=r.lholder, due_loan=r.due, total_due_interest = r.int_due
+FROM(SELECT _t.sector_id, _t.sector_name, SUM(COALESCE(principal_due,'0'))lin,SUM(COALESCE(_t.inst_due,'0')) due,COUNT(_t.member_id)lholder, SUM(COALESCE(_t.int_due,'0'))int_due 
+	 FROM _t GROUP BY _t.sector_id, _t.sector_name)r
+	 WHERE _l.sector_id= r.sector_id;
+
+UPDATE _l SET due_loan_holders=r.lholder
+FROM(SELECT _t.sector_id, COUNT(_t.member_id)lholder 
+	 FROM _t WHERE COALESCE(_t.inst_due,'0')>'0' GROUP BY _t.sector_id, _t.sector_name)r
+	 WHERE _l.sector_id= r.sector_id;
+	 
+	
+	SELECT SUM(COALESCE(_l.total_lin,'0'))::numeric INTO _total_loan FROM _l;
+	
+	
+	--select * from loan.interest_transit order by transit_id desc
+	
+	 UPDATE _l SET due_loan_percent = (_l.due_loan::numeric/_total_loan)*'100';
+
+-- sector_name character varying,
+-- 				total_lin money,
+-- 				total_account int,
+-- 				due_loan money, due_loan_holders int, due_loan_percent money, total_due_interest money, total_due_percent money) 
+   
+
+	--select * from loan.get_sectorwise_summery_report(0,'2022-04-10', 0)
+	
+	RETURN QUERY(SELECT ROW_NUMBER () OVER (ORDER BY  _l.sector_id),  _l.sector_name,_l.total_lin,
+				_l.total_account,
+				_l.due_loan , _l.due_loan_holders , _l.due_loan_percent , _l.total_due_interest , _l.total_due_percent
+				   
+ FROM _l );
+END
+$BODY$;
+
+ALTER FUNCTION loan.get_sectorwise_report_summery(integer, date, integer)
+    OWNER TO postgres;

@@ -1,0 +1,38 @@
+CREATE TABLE IF NOT EXISTS loan.loan_application(
+	application_id bigserial UNIQUE PRIMARY KEY,
+	office_id int REFERENCES office.offices(office_id)NOT NULL,
+	customer_id bigint REFERENCES core.customers (customer_id) NOT NULL,
+	audit_user_id int REFERENCES office.users(user_id) NOT NULL,
+	loan_product_id int REFERENCES loan.loan_products(loan_product_id) NOT NULL,
+	application_date date NOT NULL,
+	loan_demand_amount money,
+	approved_amount money,
+	collector_id int REFERENCES office.collectors(collector_id),
+	notes character varying(500),
+	verification_status_id int REFERENCES core.verification_statuses(verification_status_id) NOT NULL DEFAULT 0,
+	audit_ts timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS loan_application_id_ix
+ ON loan.loan_application USING btree
+ (application_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS office_id_ix
+ ON loan.loan_application USING btree
+ (office_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS customer_id_ix
+ ON loan.loan_application USING btree
+ (customer_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS audit_user_id_ix
+ ON loan.loan_application USING btree
+ (audit_user_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS loan_product_id_ix
+ ON loan.loan_application USING btree
+ (loan_product_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS collector_id_ix
+ ON loan.loan_application USING btree
+ (collector_id ASC NULLS LAST);

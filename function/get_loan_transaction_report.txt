@@ -1,0 +1,114 @@
+-- FUNCTION: loan.get_transaction_report(integer, date, date, character varying, integer, integer, smallint, smallint, boolean)
+
+-- DROP FUNCTION IF EXISTS loan.get_transaction_report(integer, date, date, character varying, integer, integer, smallint, smallint, boolean);
+
+CREATE OR REPLACE FUNCTION loan.get_transaction_report(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	trans_type_ character varying,
+	product_id_ integer,
+	user_id_ integer,
+	ibt_type_ smallint,
+	cash_type_ smallint,
+	auto_payement_ boolean)
+    RETURNS TABLE(sn integer, tran_id bigint, tran_date character varying, value_date character varying, product integer, customer_id bigint, loan_id bigint, issue money, payment money, principal money, interest money, fine money, penalty money, idiscount money, pdiscount money, loan_collection boolean, user_id integer, ibt_tran_id bigint) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE _trans		character varying(50);
+	DECLARE _product 	character varying(50);
+	DECLARE _collector	character varying(50);
+	DECLARE _user		character varying(50);
+	DECLARE _return_query	text;
+	DECLARE _total_query	text;
+	DECLARE _ibt        character varying(150);
+    DECLARE _cash       character varying(150);
+BEGIN
+DROP TABLE IF EXISTS _ltran;
+    CREATE TEMP TABLE _ltran(
+        id SERIAL NOT NULL, tran_id bigint, tran_date character varying(20), value_date character varying(20), 
+        product integer, customer_id bigint, loan_id bigint, 
+        issue money, payment money, principal money, interest money, 
+        fine money, penalty money, idiscount money, pdiscount money, 
+        loan_collection boolean, user_id integer, ibt_tran_id bigint, is_cash boolean
+        ) ON COMMIT DROP;
+
+    IF office_id_ = 0 THEN 
+		_return_query := 
+			'INSERT INTO _ltran(tran_id, tran_date, value_date, product, customer_id, loan_id, issue, payment, principal, interest, fine, penalty, 
+				idiscount, pdiscount, loan_collection, user_id, ibt_tran_id, is_cash)
+			SELECT t.tran_id, core.date_bs_from_ad(t.tran_date), core.date_bs_from_ad(t.value_date), a.loan_product_id::int, a.customer_id, 
+				t.loan_id, t.issue, COALESCE(t.principal, 0::money) + COALESCE(t.interest, 0::money) + COALESCE(t.fine, 0::money) + COALESCE(t.penalty, 0::money) - COALESCE(t.idiscount, 0::money) - COALESCE(t.pdiscount, 0::money), 
+				t.principal, t.interest, t.fine, t.penalty, t.idiscount, t.pdiscount, t.loan_collection, t.user_id, tt.ibt_tran_id, transactions.is_cash_tran(t.tran_id)
+				FROM loan.transaction_view t
+				INNER JOIN loan.loan_grant a ON t.loan_id = a.loan_id
+				LEFT JOIN (SELECT m.tran_id, m.ibt_tran_id FROM transactions.transactions m WHERE m.office_id = '|| office_id_ ||') tt ON t.tran_id = tt.tran_id
+				WHERE t.tran_date::date BETWEEN ''' || from_ ||''' AND ''' || to_  ||'''';
+	ELSE
+		_return_query := 
+			'INSERT INTO _ltran(tran_id, tran_date, value_date, product, customer_id, loan_id, issue, payment, principal, interest, fine, penalty, 
+				idiscount, pdiscount, loan_collection, user_id, ibt_tran_id, is_cash)
+			SELECT t.tran_id, core.date_bs_from_ad(t.tran_date), core.date_bs_from_ad(t.value_date), a.loan_product_id::int, a.customer_id, 
+				t.loan_id, t.issue, COALESCE(t.principal, 0::money) + COALESCE(t.interest, 0::money) + COALESCE(t.fine, 0::money) + COALESCE(t.penalty, 0::money) - COALESCE(t.idiscount, 0::money) - COALESCE(t.pdiscount, 0::money), 
+				t.principal, t.interest, t.fine, t.penalty, t.idiscount, t.pdiscount, t.loan_collection, t.user_id, tt.ibt_tran_id, transactions.is_cash_tran(t.tran_id)
+				FROM loan.transaction_view t
+				INNER JOIN loan.loan_grant a ON t.loan_id = a.loan_id
+				LEFT JOIN (SELECT m.tran_id, m.ibt_tran_id FROM transactions.transactions m WHERE m.office_id = '|| office_id_ ||') tt ON t.tran_id = tt.tran_id
+				WHERE a.office_id = '|| office_id_ ||
+			' AND t.tran_date::date BETWEEN ''' || from_ ||''' AND ''' || to_  ||'''';
+	END IF;
+
+	IF LOWER(trans_type_) <> 'all' THEN
+        _return_query := _return_query || ' AND t.book = ''' || LOWER(trans_type_) ||'''';
+	END IF;
+
+	IF COALESCE(product_id_, 0) > 0 THEN
+        _return_query := _return_query || ' AND a.loan_product_id = '|| product_id_ ;
+	END IF;
+	
+	IF COALESCE(user_id_, 0) > 0 THEN
+		_return_query := _return_query || ' AND t.user_id = '||user_id_;
+	END IF;
+
+    IF COALESCE(ibt_type_ = 2) THEN
+        _return_query := _return_query || ' AND tt.ibt_tran_id IS NOT NULL';
+    ELSIF COALESCE(ibt_type_ = 0) THEN
+    
+    ELSE
+        _return_query := _return_query || ' AND tt.ibt_tran_id IS NULL';
+    END IF;
+
+    IF auto_payement_ THEN
+        _return_query := _return_query || ' AND t.is_auto_payment = true ';
+    END IF;
+
+    RAISE NOTICE '%', _return_query;
+
+	EXECUTE _return_query;
+
+    IF COALESCE(cash_type_, 0) = 0 THEN
+        DELETE FROM _ltran WHERE _ltran.is_cash <> false;
+    ELSIF COALESCE(cash_type_, 0) = 1 THEN
+        DELETE FROM _ltran WHERE _ltran.is_cash <> true;
+    END IF;
+
+    INSERT INTO _ltran(value_date, issue, payment, principal, interest, fine, penalty, idiscount, pdiscount)
+    SELECT '    Total', SUM(COALESCE(_ltran.issue,0::money)), SUM(COALESCE(_ltran.payment,0::money)), SUM(COALESCE(_ltran.principal,0::money)), SUM(COALESCE(_ltran.interest,0::money)), 
+        SUM(COALESCE(_ltran.fine,0::money)), SUM(COALESCE(_ltran.penalty,0::money)), SUM(COALESCE(_ltran.idiscount,0::money)), SUM(COALESCE(_ltran.pdiscount,0::money))
+    FROM _ltran;
+
+	RETURN QUERY(SELECT _ltran.id, _ltran.tran_id, _ltran.tran_date, _ltran.value_date, 
+        _ltran.product, _ltran.customer_id, _ltran.loan_id, 
+        _ltran.issue, _ltran.payment, _ltran.principal, _ltran.interest, 
+        _ltran.fine, _ltran.penalty, _ltran.idiscount, _ltran.pdiscount, 
+        _ltran.loan_collection, _ltran.user_id, _ltran.ibt_tran_id
+	FROM _ltran ORDER BY _ltran.id);
+END
+$BODY$;
+
+ALTER FUNCTION loan.get_transaction_report(integer, date, date, character varying, integer, integer, smallint, smallint, boolean)
+    OWNER TO postgres;

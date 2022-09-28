@@ -1,0 +1,15 @@
+-- select * from loan.get_loan_followup_accounts()
+
+-- DROP FUNCTION IF EXISTS loan.get_loan_followup_accounts()
+
+CREATE OR REPLACE FUNCTION loan.get_loan_followup_accounts(
+	)
+	RETURNS TABLE(loan_followup_id bigint,loan_id bigint,loan_account_number character varying,loan_product_name character varying,followup_date date,followup_date_bs character varying,next_followup_date date, next_followup_date_bs character varying, member_name text, address text,contact_number text, nominee_account character varying, replied_by_member character varying, audit_user_name character varying,audit_ts timestamp with time zone)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	RETURN QUERY(SELECT * FROM loan.loan_followup_view f WHERE f.followup_date > core.get_date());
+END
+$BODY$;

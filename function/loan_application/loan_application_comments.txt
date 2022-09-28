@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS loan.loan_application_comments(
+	comment_id bigserial UNIQUE PRIMARY KEY,
+	application_id bigint REFERENCES loan.loan_application(application_id)NOT NULL,
+	commented_by int REFERENCES office.users(user_id) NOT NULL,
+	comment character varying,
+	audit_ts timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS application_id_ix
+ ON loan.loan_application_comments USING btree
+ (application_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS commented_by_ix
+ ON loan.loan_application_comments USING btree
+ (commented_by ASC NULLS LAST);

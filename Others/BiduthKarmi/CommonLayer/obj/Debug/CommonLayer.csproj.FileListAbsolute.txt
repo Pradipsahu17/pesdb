@@ -1,0 +1,16 @@
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\bin\Debug\CommonLayer.dll
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\bin\Debug\CommonLayer.pdb
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\bin\Debug\Newtonsoft.Json.dll
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.csproj.AssemblyReference.cache
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.csproj.CoreCompileInputs.cache
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.csproj.CopyComplete
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.dll
+J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.pdb
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\bin\Debug\CommonLayer.dll
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\bin\Debug\CommonLayer.pdb
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\bin\Debug\Newtonsoft.Json.dll
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.csproj.AssemblyReference.cache
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.csproj.CoreCompileInputs.cache
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.dll
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.pdb
+C:\Users\pradi\Desktop\BiduthKarmi\CommonLayer\obj\Debug\CommonLayer.csproj.CopyComplete

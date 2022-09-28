@@ -1,0 +1,54 @@
+-- select * from core.get_userwise_member_opening_report(0,0,'2019-10-10', '2022-10-10')
+
+CREATE OR REPLACE FUNCTION core.get_userwise_member_opening_report(
+	office_id_ integer,
+	user_id_ integer,
+	from_ date,
+	to_ date)
+	RETURNS TABLE(sn bigint, office_name character varying, member_id bigint, date_of_application character varying, member_name text, member_address text, contact_number text, type_of_customer text, audit_user character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		CREATE TEMP TABLE _t(
+			office_name character varying, 
+			customer_id bigint, 
+			date_of_application character varying, 
+			member_name text, 
+			member_address text, 
+			contact_number text, 
+			type_of_customer text, 
+			audit_user character varying
+		) ON COMMIT DROP;
+	
+		INSERT INTO _t
+		SELECT o.nick_name,
+			c.customer_id,
+			core.date_bs_from_ad(c.date_of_application::date),
+			cv.customer_name,
+			cv.permanent_address,
+			cv.contact_number,
+			cv.type_of_customer,
+			u.user_name
+		FROM core.customers c 
+		INNER JOIN core.customers_view cv
+			ON c.customer_id = cv.customer_id
+		INNER JOIN office.offices o 
+			ON c.office_id = o.office_id
+		INNER JOIN office.users u 
+			ON c.audit_user_id = u.user_id
+		WHERE c.status = true
+		AND c.date_of_application::date BETWEEN $3 AND $4;
+		
+		IF $1 > 0 THEN
+			DELETE FROM _t WHERE _t.office_name <> (SELECT o.nick_name FROM office.offices o WHERE o.office_id = $1);
+		END IF;
+		
+		IF $2 > 0 THEN
+			DELETE FROM _t WHERE _t.audit_user <> (SELECT u.user_name FROM office.users u WHERE u.user_id = $2);
+		END IF;
+		
+		RETURN QUERY(SELECT ROW_NUMBER() OVER(),* FROM _t);
+	END
+$BODY$;

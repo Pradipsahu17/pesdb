@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS sms.merchant_setup(
+	merchant_setup_id serial UNIQUE PRIMARY KEY NOT NULL,
+	merchant_name character varying(20) UNIQUE NOT NULL,
+	merchant_contact character varying(40) NOT NULL,
+	merchant_address character varying(40) NOT NULL,
+	account_number_id bigint REFERENCES deposit.account_holders(account_number_id) NOT NULL,
+	audit_user_id bigint REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS account_number_id_ix
+	ON sms.merchant_setup USING btree
+	(account_number_id ASC NULLS LAST);
+
+	
+CREATE INDEX IF NOT EXISTS audit_user_id_ix
+	ON sms.merchant_setup USING btree
+	(audit_user_id ASC NULLS LAST);
+	
+INSERT INTO sms.merchant_setup(merchant_name,merchant_contact,merchant_address,account_number_id,audit_user_id)
+VALUES ('Wepay','1-855-GO-WEPAY','California',48202,2);
+
+
+CREATE OR REPLACE VIEW sms.merchant_setup_view
+ AS
+	SELECT m.merchant_setup_id,
+	m.merchant_name,
+	m.merchant_address,
+	m.merchant_contact,
+	a.account_number,
+	c.customer_name,
+	c.permanent_address,
+	c.contact_number,
+	m.audit_user_id,
+	u.full_name,
+	m.audit_ts
+	FROM sms.merchant_setup m
+	INNER JOIN deposit.account_holders a ON m.account_number_id = a.account_number_id
+	INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+	INNER JOIN office.users u ON m.audit_user_id = u.user_id;

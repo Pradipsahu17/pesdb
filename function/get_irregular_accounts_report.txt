@@ -1,0 +1,233 @@
+-- select * from deposit.get_irregular_accounts_report(0, 0, '2022-10-10', '2022-10-11', '1000')
+
+-- DROP FUNCTION IF EXISTS deposit.get_irregular_accounts_report(integer, integer, date, date, money);
+
+CREATE OR REPLACE FUNCTION deposit.get_irregular_accounts_report(
+	office_id_ integer,
+	deposit_product_id_to_ integer,
+	from_ date,
+	to_ date,
+	amount money)
+    RETURNS TABLE(sn bigint, office_id character varying, customer_id bigint, member_name text, acc bigint, acc_no character varying, balance money, credit money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE _t(
+		office_name character varying,
+		customer_id bigint, 
+		member_name text,
+		acc bigint,
+		acc_no character varying,
+		balance money,
+		credit money
+	) ON COMMIT DROP;
+
+	IF $1 = 0 THEN
+		IF $2 = 0 THEN
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				COALESCE(SUM(td.credit), 0::MONEY) AS credit
+			FROM deposit.account_holders a
+			INNER JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			INNER JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id			 
+			WHERE a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name)t where t.credit <= $5::money;
+			
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				'0'
+			FROM deposit.account_holders a
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id
+			WHERE a.account_number_id 
+			NOT IN(
+				SELECT a.account_number_id FROM deposit.account_holders a
+				INNER JOIN transactions.transaction_details td
+					ON td.account_number_id = a.account_number_id
+				INNER JOIN transactions.transactions t
+					ON td.tran_id = t.tran_id			 
+				WHERE a.status = true
+				AND t.tran_date  BETWEEN $3 AND $4
+			) AND a.status = true
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name;
+		ELSE
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				COALESCE(SUM(td.credit), 0::MONEY) AS credit
+			FROM deposit.account_holders a
+			INNER JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			INNER JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id		
+			WHERE a.deposit_product_id = $2
+			AND a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name)t where t.credit <= $5::money;
+			
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				'0'
+			FROM deposit.account_holders a
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id
+			WHERE a.account_number_id 
+			NOT IN(
+				SELECT a.account_number_id FROM deposit.account_holders a
+				INNER JOIN transactions.transaction_details td
+					ON td.account_number_id = a.account_number_id
+				INNER JOIN transactions.transactions t
+					ON td.tran_id = t.tran_id			 
+				WHERE a.deposit_product_id = $2
+				AND a.status = true
+				AND t.tran_date  BETWEEN $3 AND $4
+			) AND a.status = true
+			AND a.deposit_product_id = $2
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name;
+		END IF;
+	ELSE
+		IF $2 = 0 THEN
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				COALESCE(SUM(td.credit), 0::MONEY) AS credit
+			FROM deposit.account_holders a
+			INNER JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			INNER JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id		
+			WHERE a.office_id = $1
+			AND a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name) t where t.credit <= $5::money;
+			
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				'0'
+			FROM deposit.account_holders a
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id
+			WHERE a.account_number_id 
+			NOT IN(
+				SELECT a.account_number_id FROM deposit.account_holders a
+				INNER JOIN transactions.transaction_details td
+					ON td.account_number_id = a.account_number_id
+				INNER JOIN transactions.transactions t
+					ON td.tran_id = t.tran_id			 
+				WHERE a.status = true
+				AND a.office_id = $1
+				AND t.tran_date  BETWEEN $3 AND $4
+			) AND a.status = true
+			AND a.office_id = $1
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name;
+		ELSE
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				COALESCE(SUM(td.credit), 0::MONEY) AS credit
+			FROM deposit.account_holders a
+			INNER JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			INNER JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id		
+			WHERE a.deposit_product_id = $2
+			AND a.office_id = $1
+			AND a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name)t where t.credit <= $5::money;
+			
+			INSERT INTO _t(office_name,customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT o.nick_name,
+				a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_balance(a.account_number),
+				'0'
+			FROM deposit.account_holders a
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			INNER JOIN office.offices o
+				ON a.office_id = o.office_id
+			WHERE a.account_number_id 
+			NOT IN(
+				SELECT a.account_number_id FROM deposit.account_holders a
+				INNER JOIN transactions.transaction_details td
+					ON td.account_number_id = a.account_number_id
+				INNER JOIN transactions.transactions t
+					ON td.tran_id = t.tran_id			 
+				WHERE a.deposit_product_id = $2
+				AND a.office_id = $1
+				AND a.status = true
+				AND t.tran_date  BETWEEN $3 AND $4
+			) AND a.status = true
+			AND a.deposit_product_id = $2
+			AND a.office_id = $1
+			GROUP BY a.account_number_id,o.nick_name,a.customer_id,c.customer_name;
+		END IF;
+	END IF;
+
+	RETURN QUERY(SELECT ROW_NUMBER() OVER (ORDER BY _t.customer_id),_t.office_name,_t.customer_id,_t.member_name,_t.acc,_t.acc_no,_t.balance,_t.credit FROM _t);
+END
+$BODY$;

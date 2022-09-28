@@ -1,0 +1,13 @@
+CREATE OR REPLACE FUNCTION core.get_customer_duration(
+	customer_id_ bigint)
+	RETURNS TABLE(duration integer)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT DATE_PART('day', (select core.get_date()) - (Select date_of_application from core.customers where customer_id=$1))::integer
+		);
+	END
+$BODY$;

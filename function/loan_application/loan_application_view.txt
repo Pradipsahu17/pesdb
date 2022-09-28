@@ -1,0 +1,29 @@
+CREATE OR REPLACE VIEW loan.loan_application_view
+ AS
+	SELECT a.application_id,
+		a.office_id,
+		u.office_name,
+		a.customer_id,
+		c.customer_name,
+		(select customer_address FROM core.get_address(a.customer_id)),
+		a.audit_user_id,
+		u.user_name AS entry_by,
+		a.loan_product_id,
+		p.loan_product_name,
+		a.application_date,
+		(select * from core.date_bs_from_ad(a.application_date)) AS application_date_bs,
+		a.loan_demand_amount,
+		a.approved_amount,
+		a.collector_id,
+		cv.collector_name,
+		a.notes,
+		a.verification_status_id,
+		v.verification_status_name,
+		a.audit_ts
+	FROM loan.loan_application a
+	INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+	INNER JOIN office.offices_view o ON a.office_id = o.office_id
+	INNER JOIN office.users_view u ON a.audit_user_id = u.user_id
+	INNER JOIN loan.loan_products p ON a.loan_product_id = p.loan_product_id
+	INNER JOIN office.collectors_view cv ON a.collector_id = cv.collector_id
+	INNER JOIN core.verification_statuses v ON a.verification_status_id = v.verification_status_id;

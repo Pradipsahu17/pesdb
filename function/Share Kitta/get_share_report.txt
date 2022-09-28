@@ -1,0 +1,51 @@
+-- select * from transactions.get_share_report()
+
+-- DROP FUNCTION IF EXISTS transactions.get_share_report();
+
+CREATE OR REPLACE FUNCTION transactions.get_share_report(
+	)
+    RETURNS TABLE(sn bigint,member_name text, address text, contact_number text, account_number character varying, acc_open_date date, opening_bal money, closing_bal money, kitta_no text) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE t_(
+		customer_name text, 
+		permanent_address text, 
+		contact_number text, 
+		account_number character varying, 
+		account_open_date date,
+		op_bal money, 
+		clo_bal money,
+		kitta text
+	) on commit drop;
+	
+	INSERT INTO t_
+	SELECT c.customer_name,
+		c.permanent_address,
+		c.contact_number,
+		s.account_number,
+		s.account_open_date::date,
+		s.opening_share_amount op_bal,
+		core.get_share_account_balance(s.share_account_id, core.get_date()) clo_bal,
+		MIN(t.kitta_no) || ' - ' || MAX(t.kitta_no)
+	FROM core.share_accounts s
+	INNER JOIN transactions.share_transaction t
+		ON s.share_account_id = t.share_account_id
+	INNER JOIN transactions.share_issue_details d
+		ON t.kitta_no = d.kitta_no
+	INNER JOIN core.customers_view c
+		ON s.customer_id = c.customer_id
+	WHERE d.status = false
+	GROUP BY s.account_number,c.customer_name,c.permanent_address,c.contact_number,s.account_open_date,op_bal,clo_bal,t.tran_id;
+	
+	RETURN QUERY (
+		SELECT ROW_NUMBER() over (order by (t_.account_number)),t_.customer_name,t_.permanent_address, t_.contact_number, t_.account_number, t_.account_open_date,t_.op_bal, t_.clo_bal,string_agg(t_.kitta,' , ') 
+		FROM t_
+		GROUP BY t_.customer_name,t_.permanent_address, t_.contact_number, t_.account_number, t_.account_open_date,t_.op_bal, t_.clo_bal
+	);
+END
+$BODY$;

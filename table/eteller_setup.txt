@@ -1,0 +1,68 @@
+-- Table: deposit.eteller_setup
+
+-- DROP TABLE IF EXISTS deposit.eteller_setup;
+
+CREATE TABLE IF NOT EXISTS deposit.eteller_setup
+(
+	eteller_id serial UNIQUE PRIMARY KEY NOT NULL,
+	office_id integer REFERENCES office.offices (office_id) NOT NULL,
+	account_number_id bigint REFERENCES deposit.account_holders (account_number_id) NOT NULL,
+	audit_user_id integer REFERENCES office.users (user_id) NOT NULL,
+	audit_ts timestamp with time zone NOT NULL DEFAULT now()
+)
+
+ALTER TABLE IF EXISTS deposit.eteller_setup
+    OWNER to postgres;
+
+-- Index: eteller_setup_account_number_id_ix
+
+-- DROP INDEX IF EXISTS deposit.eteller_setup_account_number_id_ix;
+
+CREATE INDEX IF NOT EXISTS eteller_setup_account_number_id_ix
+    ON deposit.eteller_setup USING btree
+    (account_number_id ASC NULLS LAST)
+    TABLESPACE pg_default;
+-- Index: eteller_setup_audit_user_id_ix
+
+-- DROP INDEX IF EXISTS deposit.eteller_setup_audit_user_id_ix;
+
+CREATE INDEX IF NOT EXISTS eteller_setup_audit_user_id_ix
+    ON deposit.eteller_setup USING btree
+    (audit_user_id ASC NULLS LAST)
+    TABLESPACE pg_default;
+-- Index: eteller_setup_office_id_ix
+
+-- DROP INDEX IF EXISTS deposit.eteller_setup_office_id_ix;
+
+CREATE INDEX IF NOT EXISTS eteller_setup_office_id_ix
+    ON deposit.eteller_setup USING btree
+    (office_id ASC NULLS LAST)
+    TABLESPACE pg_default;
+
+
+
+
+-- View: deposit.eteller_setup_view
+
+-- DROP VIEW deposit.eteller_setup_view;
+
+CREATE OR REPLACE VIEW deposit.eteller_setup_view
+ AS
+ SELECT e.eteller_id,
+    e.office_id,
+    o.office_name,
+    e.account_number_id,
+    c.customer_name,
+    u.user_name,
+    u.full_name,
+    e.audit_user_id,
+    e.audit_ts
+   FROM deposit.eteller_setup e
+     JOIN office.offices o ON e.office_id = o.office_id
+     JOIN deposit.account_holders a ON e.account_number_id = a.account_number_id
+     JOIN core.customers_view c ON a.customer_id = c.customer_id
+     JOIN office.users u ON e.audit_user_id = u.user_id;
+
+ALTER TABLE deposit.eteller_setup_view
+    OWNER TO postgres;
+

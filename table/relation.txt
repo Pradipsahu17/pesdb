@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS core.relation(
+	relation_id serial PRIMARY KEY UNIQUE NOT NULL,
+	relation_name character varying(15) NOT NULL,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now()
+);

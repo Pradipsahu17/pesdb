@@ -1,0 +1,14 @@
+CREATE OR REPLACE VIEW insurance.insurance_maturity_view
+ AS
+	SELECT s.office_id,
+		s.insurance_id,
+		s.customer_name,
+		s.permanent_address,
+		s.loan_account_number,
+		s.insured_date,
+		s.expiry_date,
+		s.company_name,
+		s.insurance_item_name,
+		s.insured_amount
+	FROM insurance.insurance_view s
+	WHERE s.expiry_date <= (SELECT core.get_date());

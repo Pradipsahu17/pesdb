@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS office.leave_type(
+	leave_type_id serial PRIMARY KEY UNIQUE NOT NULL,
+	type_name character varying(30) NOT NULL,
+	is_active boolean DEFAULT true,
+	audit_user_id integer REFERENCES office.users(user_id),
+	audit_ts timestamp with time zone DEFAULT now()
+)

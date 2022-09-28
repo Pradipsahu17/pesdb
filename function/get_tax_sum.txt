@@ -1,0 +1,31 @@
+CREATE OR REPLACE FUNCTION deposit.get_sum_tax(
+	from_ date,
+	to_ date,
+	account_number_id_ bigint)
+	RETURNS TABLE (from_date character varying(10),to_date character varying(10), account_name character varying, account_number character varying, product_name character varying, tax numeric)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		CREATE TEMP TABLE _t(from_date character varying(10),to_date character varying(10), account_name character varying, account_number character varying, product_name character varying, tax numeric) ON COMMIT DROP;
+		
+		INSERT INTO _t(from_date, to_date , account_name, account_number, product_name, tax)
+		SELECT (select date_in_bs from core.date_conversion where date_in_ad=$1),
+		(select date_in_bs from core.date_conversion where date_in_ad=$2),
+		c.customer_name, 
+		a.account_number,
+		p.deposit_product_name,
+ 		sum(t.tax)
+		FROM deposit.account_holders a INNER jOIN
+		core.customers_view c ON a.customer_id = c.customer_id
+		INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+ 		INNER JOIN deposit.interest_transit t ON a.account_number_id = t.account_number_id
+		WHERE a.account_number_id = $3 and t.value_date BETWEEN $1 and $2 
+		GROUP BY c.customer_name, 
+		a.account_number,
+		p.deposit_product_name; 
+		
+		RETURN QUERY(SELECT * FROM _t);
+	END
+$BODY$;

@@ -1,0 +1,109 @@
+-- select * from core.get_deposit_product_report_all_office('2021-10-10', '2021-11-11')
+
+-- DROP FUNCTION IF EXISTS core.get_deposit_product_report_all_office(date, date);
+
+CREATE OR REPLACE FUNCTION core.get_deposit_product_report_all_office(
+	from_ date,
+	to_ date)
+    RETURNS TABLE(heading integer, office_name character varying, deposit_product_name character varying,total_account integer, saving_amount money, is_heading boolean) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE total_ds_acc_ integer;
+DECLARE ds_saving_amount_ money;
+DECLARE saving_amount_ money;
+DECLARE i integer := 1;
+DECLARE l integer;
+DECLARE product_name_ character varying;
+DECLARE office_name_ character varying;
+BEGIN
+	-- Temp table
+	CREATE TEMP TABLE _t(
+		heading integer,
+		office_name character varying,
+		deposit_product_name character varying,
+		total_account integer,
+		saving_amount money,
+		is_heading boolean) ON COMMIT DROP;
+	
+	-- daily saving
+	
+	SELECT count(*) INTO total_ds_acc_ FROM deposit.account_holders 	
+	WHERE account_open_date <= $2
+	AND status = true;
+	
+	SELECT sum(m.debit) INTO ds_saving_amount_
+	FROM deposit.mv_transaction_view m
+	INNER JOIN deposit.account_holders a ON m.account_number_id = a.account_number_id
+	WHERE m.tran_date BETWEEN $1 AND $2;
+	
+	CREATE TEMP TABLE _t1(order_id serial, product_id integer, product_name character varying) ON COMMIT DROP;
+	INSERT INTO _t1(product_id, product_name)
+	SELECT p.deposit_product_id, p.deposit_product_name FROM core.deposit_products p WHERE p.status = true;
+	
+	LOOP
+		SELECT COALESCE(COUNT(*),0) INTO total_ds_acc_ FROM deposit.account_holders 
+		WHERE deposit_product_id = (SELECT _t1.product_id FROM _t1 WHERE order_id = i)
+		AND account_open_date <= $2
+		AND status = true;
+		
+		SELECT COALESCE(SUM(m.debit),'0') INTO saving_amount_
+		FROM deposit.mv_transaction_view m
+		INNER JOIN deposit.account_holders a ON m.account_number_id = a.account_number_id
+		WHERE m.tran_date BETWEEN $1 AND $2
+		AND deposit_product_id = (SELECT _t1.product_id FROM _t1 WHERE order_id = i);
+		
+		SELECT _t1.product_name INTO product_name_ FROM _t1 WHERE order_id = i;
+		INSERT INTO _t(heading, deposit_product_name, total_account, saving_amount,is_heading)
+		VALUES (i, product_name_, total_ds_acc_, saving_amount_,false);
+		
+		DROP TABLE IF EXISTS _ot;
+		CREATE TEMP TABLE _ot(sn bigint, office_name character varying) ON COMMIT DROP;
+		
+		INSERT INTO _ot
+		SELECT ROW_NUMBER() OVER(),o.nick_name FROM office.offices o;
+		
+		l := 1;
+		
+		LOOP
+			SELECT _ot.office_name INTO office_name_ FROM _ot WHERE _ot.sn = l;
+			
+			-- OFFICEWISE TOTAL ACC
+			SELECT COALESCE(COUNT(*),0) INTO total_ds_acc_ FROM deposit.account_holders a
+			INNER JOIN office.offices o ON o.office_id = a.office_id
+			WHERE deposit_product_id = (SELECT _t1.product_id FROM _t1 WHERE order_id = i)
+			AND a.account_open_date <= $2
+			AND a.status = true
+			AND o.nick_name = office_name_;
+			
+			-- OFFICEWISE SAVING AMOUNT
+			SELECT COALESCE(SUM(m.debit),'0') INTO saving_amount_
+			FROM deposit.mv_transaction_view m
+			INNER JOIN deposit.account_holders a ON m.account_number_id = a.account_number_id
+			INNER JOIN office.offices o ON o.office_id = a.office_id
+			WHERE m.tran_date BETWEEN $1 AND $2
+			AND deposit_product_id = (SELECT _t1.product_id FROM _t1 WHERE order_id = i)
+			AND o.nick_name = office_name_;
+
+			INSERT INTO _t(office_name, deposit_product_name, total_account, saving_amount, is_heading)
+			VALUES (office_name_, product_name_, total_ds_acc_, saving_amount_, false);
+
+			l = l + 1;
+			EXIT WHEN l > (SELECT COUNT(*) FROM _ot);
+		END LOOP;
+		
+		i = i + 1;
+		EXIT WHEN i > (SELECT COUNT(*) FROM _t1);
+	END LOOP;
+	
+	INSERT INTO _t(deposit_product_name, total_account, saving_amount)
+	SELECT 'Total', SUM(_t.total_account), SUM(_t.saving_amount) 
+	FROM _t;
+
+	RETURN QUERY (SELECT * FROM _t);
+END
+$BODY$;
+

@@ -1,0 +1,174 @@
+SELECT * FROM core.copomis_heading
+
+SELECT * FROM core.copomis_setup
+
+CREATE TABLE IF NOT EXISTS core.copomis_heading(
+	heading_id serial PRIMARY KEY UNIQUE NOT NULL,
+	account_head character varying NOT NULL,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp without time zone DEFAULT now());
+	
+CREATE TABLE IF NOT EXISTS core.copomis_setup(
+	copomis_setup_id serial PRIMARY KEY UNIQUE NOT NULL,
+	heading_id integer REFERENCES core.copomis_heading(heading_id),
+	gl_account_id bigint REFERENCES core.gl_accounts(gl_account_id) UNIQUE,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp without time zone DEFAULT now());
+
+CREATE OR REPLACE VIEW core.copomis_setup_view
+ AS
+  SELECT c.copomis_setup_id,
+    c.heading_id,
+	h.account_head,
+    c.gl_account_id,
+	g.account_name,
+    c.audit_user_id 
+  FROM core.copomis_setup c
+  INNER JOIN core.copomis_heading h ON h.heading_id = c.heading_id
+  INNER JOIN core.gl_accounts g ON g.gl_account_id = c.gl_account_id;
+
+INSERT INTO core.copomis_heading(account_head,audit_user_id)
+SELECT 'जगेडा कोष', 1 UNION ALL
+SELECT 'शेयर लाभांश कोष ', 1 UNION ALL
+SELECT 'संरक्षित पूँजी कोष ', 1 UNION ALL
+SELECT 'कर्मचारी बोनस कोष ', 1 UNION ALL
+SELECT 'सहकारी शिक्षा कोष ', 1 UNION ALL
+SELECT 'सहकारी विकास कोष ', 1 UNION ALL
+SELECT 'घाटापुर्ति कोष ', 1 UNION ALL
+SELECT 'स्थिरिकरण कोष (संघको हकमा मात्र)', 1 UNION ALL
+SELECT 'सहकारी प्रबन्धन कोश', 1 UNION ALL
+SELECT 'स्थिरीकारण कोश', 1 UNION ALL
+SELECT 'सामुदायिक बिकास कोश', 1 UNION ALL
+SELECT 'अन्य जोखिम बेबस्थापान कोश ', 1 UNION ALL
+SELECT 'कम आयु भएका', 1 UNION ALL
+SELECT 'ऋण सुरक्षण कोष ', 1 UNION ALL
+SELECT 'बाँडफाँड नगरेको खुद वचत', 1 UNION ALL
+SELECT 'सदस्य राहात कोष ', 1 UNION ALL
+SELECT 'नियमित वचत ', 1 UNION ALL
+SELECT 'ऐक्षिक वचत ', 1 UNION ALL
+SELECT 'आवधिक वचत ', 1 UNION ALL
+SELECT 'बाल बचत', 1 UNION ALL
+SELECT 'धरौटी', 1 UNION ALL
+SELECT 'तिर्नुपर्ने तलब भत्ता', 1 UNION ALL
+SELECT 'तिर्नुपर्ने घर भाडा', 1 UNION ALL
+SELECT 'वाणिज्य वैंक वाट लिएको ऋण', 1 UNION ALL
+SELECT 'तिर्नुपर्ने ब्याज', 1 UNION ALL
+SELECT 'राष्ट्रीय सहकारी वैंक वाट लिएको ऋण', 1 UNION ALL
+SELECT 'तिर्नुपर्ने लेखा परिक्षण शुल्क', 1 UNION ALL
+SELECT 'केन्द्रिय सहकारी संघ वाट लिएको ऋण', 1 UNION ALL
+SELECT 'जिल्ला सहकारी संघ वाट लिएको ऋण', 1 UNION ALL
+SELECT 'ब्याज मुल्तवी', 1 UNION ALL
+SELECT 'अन्य दायित्व', 1 UNION ALL
+SELECT 'अन्य संघ/संस्थाहरु बाट लिएको ऋण', 1 UNION ALL
+SELECT 'सानो नगदी कोष ', 1 UNION ALL
+SELECT 'नेपाल राष्ट्र बैंक बाट लिएको ऋण', 1 UNION ALL
+SELECT 'सेफ भल्ट नगद', 1 UNION ALL
+SELECT 'अन्य वित्तिय संस्था वाट लिएको ऋण', 1 UNION ALL
+SELECT 'व्यापार व्यवसायमा लगानी', 1 UNION ALL
+SELECT 'उद्योग व्यवसायमा लगानी', 1 UNION ALL
+SELECT 'उधारो खरिद र भुक्तानी', 1 UNION ALL
+SELECT 'कृषिमा लागानी', 1 UNION ALL
+SELECT 'पेश्की प्राप्त र फछ्याैट ', 1 UNION ALL
+SELECT 'घर जग्गा ऋण लगानी', 1 UNION ALL
+SELECT 'शैक्षिक ऋण लागनी', 1 UNION ALL
+SELECT 'कर्मचारी हित कोष', 1 UNION ALL
+SELECT 'सापटि प्राप्त र फिर्ता', 1 UNION ALL
+SELECT 'हायर पर्चेज ऋण लगानी', 1 UNION ALL
+SELECT 'अन्य ऋण लगानी', 1 UNION ALL
+SELECT 'ब्याज कर दायित्व', 1 UNION ALL
+SELECT 'उधारो विक्री र अशुली', 1 UNION ALL
+SELECT 'आयकर ब्यवस्था', 1 UNION ALL
+SELECT 'पेश्की दिएको र फछ्याैट', 1 UNION ALL
+SELECT 'समाजिक सुरक्षा कर', 1 UNION ALL
+SELECT 'पाउनू पर्ने ब्याज', 1 UNION ALL
+SELECT 'घर जग्गा बहाल कर', 1 UNION ALL
+SELECT 'पारिश्रमिक कर', 1 UNION ALL
+SELECT 'सापटि दिएको र र्फिता ', 1 UNION ALL
+SELECT 'अन्य भूक्तानी दिनु पर्ने', 1 UNION ALL
+SELECT 'कर्मचारी हितकोष ', 1 UNION ALL
+SELECT 'बेरुजु सर्टेज ', 1 UNION ALL
+SELECT 'धरौटी हिसाव', 1 UNION ALL
+SELECT 'अग्रिम कर दाखिला ', 1 UNION ALL
+SELECT 'अन्य पाउनु पर्ने ', 1 UNION ALL
+SELECT 'कम्प्यूटर जन्य उपकरण ', 1 UNION ALL
+SELECT 'कार्यालय जन्य उपकरणहरु ', 1 UNION ALL
+SELECT 'अन्तिम मालशेष ', 1 UNION ALL
+SELECT 'अन्य भौतिक ', 1 UNION ALL
+SELECT 'घर जग्गा जमिन', 1 UNION ALL
+SELECT 'पूर्व सञ्चालन खर्च ', 1 UNION ALL
+SELECT 'शुद्ध नोक्सान ', 1 UNION ALL
+SELECT 'बैक (चल्ती)', 1 UNION ALL
+SELECT 'राष्ट्रिय सहकारी बैक लि. (चल्ती)', 1 UNION ALL
+SELECT 'मिन्हा अपलेखन ', 1 UNION ALL
+SELECT 'विषयगत केन्द्रिय सहकारी संघ लि. (चल्ती)', 1 UNION ALL
+SELECT 'अन्य नाममात्रको सम्पत्ति ', 1 UNION ALL
+SELECT 'विषयगत जिल्ला सहकारी संघ लि. (चल्ती)', 1 UNION ALL
+SELECT 'अन्य वित्तिय संस्था (चल्ती)', 1 UNION ALL
+SELECT 'धितो पत्र', 1 UNION ALL
+SELECT 'आवधिक', 1 UNION ALL
+SELECT 'वचत', 1 UNION ALL
+SELECT 'शेयर हिसाब खाता', 1 UNION ALL
+SELECT 'ब्यबसाय परियोजनामा लगानी', 1 UNION ALL
+SELECT 'अन्य कोष -', 1 UNION ALL
+SELECT 'कर्मचारी तलव भत्ता  खर्च ', 1 UNION ALL
+SELECT 'कर्मचारी भ्रमण तथा यातायात खर्च', 1 UNION ALL
+SELECT 'कर्मचारी चाडपर्व खर्च', 1 UNION ALL
+SELECT 'कर्मचारी ड्रेस (पोशाक) खर्च', 1 UNION ALL
+SELECT 'कर्मचारी उपदान खर्च', 1 UNION ALL
+SELECT 'फर्निचर', 1 UNION ALL
+SELECT 'सामाजिक सुरक्षा कोश', 1 UNION ALL
+SELECT 'व्यवशायिक उपकरण तथा मेशिनरी औजार ', 1 UNION ALL
+SELECT 'सवारी साधन', 1 UNION ALL
+SELECT 'सामान बिक्री', 1 UNION ALL
+SELECT 'व्यपारिक छूट प्राप्त आम्दानी ', 1 UNION ALL
+SELECT 'मूल्य अभिवृद्धि फिर्ता आम्दानी', 1 UNION ALL
+SELECT 'ऋणबाट ब्याज प्राप्त्त', 1 UNION ALL
+SELECT 'तरल लगानीबाट ब्याज प्राप्त्त', 1 UNION ALL
+SELECT 'तालिम / शिक्षा सहभागीता शुल्क बाट प्राप्त्त', 1 UNION ALL
+SELECT 'प्रशासनीक अनुदान बाट प्राप्त्त', 1 UNION ALL
+SELECT 'ऋण ब्यवस्थापन शूल्क बाट प्राप्त्त', 1 UNION ALL
+SELECT 'हर्जना / जरिवाना बाट प्राप्त्त', 1 UNION ALL
+SELECT 'भवन/गोदाम वा अन्य भाडा बाट प्राप्त्त', 1 UNION ALL
+SELECT 'सामान खरीद', 1 UNION ALL
+SELECT 'ढुवानी खर्च', 1 UNION ALL
+SELECT 'अपलेखन उठन्ती बाट प्राप्त्त', 1 UNION ALL
+SELECT 'बित्तिय लगनीबाट ब्याज बाट प्राप्त ', 1 UNION ALL
+SELECT 'शेयर लगानीबाट लाभांस प्राप्त', 1 UNION ALL
+SELECT 'ज्याला खर्च', 1 UNION ALL
+SELECT 'ब्यापार व्यवसाय प्रवर्दन खर्च ', 1 UNION ALL
+SELECT 'ऋण नोक्सानी ब्यवस्थाबाट प्राप्त', 1 UNION ALL
+SELECT 'व्यपारिक छूट दिएको खर्च', 1 UNION ALL
+SELECT 'अन्य / विविध आम्दानी', 1 UNION ALL
+SELECT 'प्रारम्भिक माल शेष', 1 UNION ALL
+SELECT 'घर भाडा तथा गोदाम खर्च', 1 UNION ALL
+SELECT 'बचतमा ब्याज खर्च ', 1 UNION ALL
+SELECT 'ऋणमा ब्याज खर्च ', 1 UNION ALL
+SELECT 'ऋण सुरक्षाको बिमा शुल्क खर्च', 1 UNION ALL
+SELECT 'हर्जना / जरिवाना खर्च', 1 UNION ALL
+SELECT 'घर भाडा खर्च ', 1 UNION ALL
+SELECT 'बैठक भत्ता खर्च', 1 UNION ALL
+SELECT 'भ्रमण तथा यातायात खर्च', 1 UNION ALL
+SELECT 'स्टेशनरी तथा मसलन्द ', 1 UNION ALL
+SELECT 'अनुगमन तथा अवलोकन खर्च', 1 UNION ALL
+SELECT 'मर्मत तथा सम्भार ', 1 UNION ALL
+SELECT 'ह्रास कट्टी खर्च', 1 UNION ALL
+SELECT 'सधारण सभा खर्च', 1 UNION ALL
+SELECT 'इन्धन तथा यातायत', 1 UNION ALL
+SELECT 'शिक्षा  / तालिम खर्च', 1 UNION ALL
+SELECT 'गोष्ठि तथा सम्मेलन खर्च', 1 UNION ALL
+SELECT 'विधुत महशुल खर्च ', 1 UNION ALL
+SELECT 'पानी तथा सरसफाई खर्च', 1 UNION ALL
+SELECT 'सामाजिक /सामुदायिक क्रियाकलाप खर्च', 1 UNION ALL
+SELECT 'सञ्चार महसुल खर्च', 1 UNION ALL
+SELECT 'अतिथि सत्कार खर्च', 1 UNION ALL
+SELECT 'सदस्यता / प्रवेश शुल्क खर्च', 1 UNION ALL
+SELECT 'सदस्यता / प्रबेश शुल्क बाट प्राप्त्त', 1 UNION ALL
+SELECT 'लेखापरीक्षण खर्च', 1 UNION ALL
+SELECT 'बैकं चार्ज खर्च', 1 UNION ALL
+SELECT 'प्रवर्दन (विज्ञापन, प्रचार, प्रसार) खर्च', 1 UNION ALL
+SELECT 'ऋण नोक्सानी व्यवस्थापन (सुरक्षण) खर्च', 1 UNION ALL
+SELECT 'अपलेखन /मिनाहा / नोक्सानी सामान खर्च', 1 UNION ALL
+SELECT 'व्याज छुट खर्च', 1 UNION ALL
+SELECT 'ऋण अनूगमन खर्च', 1 UNION ALL
+SELECT 'अन्य / विविध खर्च ', 1 UNION ALL
+SELECT 'शेयर ', 1;

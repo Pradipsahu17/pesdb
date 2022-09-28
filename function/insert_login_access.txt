@@ -1,0 +1,23 @@
+CREATE OR REPLACE FUNCTION post_policies_login_access(
+	)
+	RETURNS TABLE(login_access_id integer,user_id bigint, hours_from time without time zone, hours_to time without time zone, access_from timestamp without time zone, access_to timestamp without time zone, holiday_access boolean, status boolean, audit_user_id integer, audit_ts timestamp with time zone)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+			INSERT INTO policies.login_access (user_id,hours_from,hours_to,access_from,access_to,holiday_access,status,audit_user_id,audit_ts)
+			SELECT DISTINCT u.user_id,
+			'10:00:00'::time without time zone,
+			'16:00:00'::time without time zone,
+			(select current_timestamp)::timestamp without time zone,
+ 			(select date('now') + interval '1 year')::timestamp without time zone,
+			'false'::boolean,
+			u.is_active,
+			u.audit_user_id,
+			(select current_timestamp)::timestamp with time zone
+			FROM office.users u WHERE u.user_id NOT IN (SELECT l.user_id FROM policies.login_access l);
+			
+			RETURN QUERY (select * from policies.login_access);
+	END
+$BODY$;

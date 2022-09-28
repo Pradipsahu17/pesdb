@@ -1,0 +1,138 @@
+-- FUNCTION: bsmart.coop_transfer_out(character varying, character varying, character varying, character varying, character varying, character varying, character varying, money, character varying, character varying, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS bsmart.coop_transfer_out(character varying, character varying, character varying, character varying, character varying, character varying, character varying, money, character varying, character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION bsmart.coop_transfer_out(
+	api_user_id_ character varying,
+	from_acc_ character varying,
+	destination_bank_ character varying,
+	destination_accountname_ character varying,
+	destination_accountnumber_ character varying,
+	destination_branchcode_ character varying,
+	m_receivable_ character varying,
+	amount_ money,
+	customer_mobile_num_ character varying,
+	statement_ character varying,
+	gateway_name_ character varying,
+	tran_type_ character varying)
+    RETURNS TABLE(cbs_tran_id bigint) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+	DECLARE _cust_office_id	integer;
+	DECLARE _cor_office_id 	integer;
+	DECLARE _tran_id	bigint;
+	DECLARE _rem_tran_id	bigint;
+    DECLARE _ibt_tran_id 	bigint;
+	DECLARE _sys_id		integer;
+	DECLARE _date		date;
+	DECLARE _balance	money;
+	DECLARE _from_ac_id	bigint;
+	DECLARE _to_adv_ac	bigint;--mplanet receivable ledger
+    DECLARE _cor_ibt_pay_gl	bigint;--payable to corporate office from other office
+	DECLARE _cor_rem_rec_gl	bigint;--receivable from other office by corporate office
+	
+-- 	SELECT * FROM bsmart.coop_transfer_out('1','01-23-00000547','Abcd Bank','ram','00012','-23',
+-- '0123456788',123,'100','9841665988','test by jev','wepay','Coop')
+
+	
+BEGIN	
+	IF NOT EXISTS(SELECT gl_account_id  FROM core.bank_accounts  WHERE account_number = m_receivable_) THEN
+		RAISE EXCEPTION 'Bank Ac Not Found';
+		ELSE
+		SELECT gl_account_id INTO _to_adv_ac FROM core.bank_accounts  WHERE account_number = m_receivable_;
+	END IF;
+
+	
+	
+	SELECT sms.get_drawing_power(from_acc_) INTO _balance;
+
+	IF  _balance  <= amount_ THEN
+		RAISE EXCEPTION 'Not Enough Balance';
+
+		END IF;
+
+	SELECT office.get_sys_user_id() INTO _sys_id;
+	SELECT now()::date INTO _date;
+	
+
+	SELECT office_id, account_number_id FROM deposit.account_holders WHERE account_number=from_acc_ INTO _cust_office_id, _from_ac_id;
+
+	--SELECT gl_account_id INTO _to_adv_ac FROM core.gl_accounts  WHERE account_name = m_receivable_;
+
+	SELECT office_id FROM office.offices WHERE parent_office_id IS NULL INTO _cor_office_id;
+
+IF _cust_office_id = _cor_office_id THEN
+        INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id
+              )
+        SELECT _cust_office_id, _date, _date, 'Mbanking',amount_,_sys_id, false, 1,_sys_id,_sys_id;
+		
+		  SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id)
+
+        select _tran_id, deposit.product_gl_account_id(from_acc_),_from_ac_id, amount_, NULL, statement_, _sys_id union all 
+        select _tran_id, _to_adv_ac, NULL, NULL, amount_, statement_, _sys_id;
+
+ELSE
+
+		SELECT local_payable_gl_account_id INTO _cor_ibt_pay_gl FROM core.ibt_setup
+        WHERE local_office_id=_cor_office_id;
+		
+		SELECT local_receivable_gl_account_id INTO _cor_rem_rec_gl FROM core.ibt_setup
+        WHERE local_office_id=_cust_office_id;	
+
+		INSERT INTO transactions.ibt_transactions(book_name,local_office_id,audit_user_id)
+        SELECT 'Mbanking',_cust_office_id,_sys_id;
+        
+                
+        SELECT CURRVAL('transactions.ibt_transactions_ibt_tran_id_seq') INTO _ibt_tran_id;
+
+            INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id
+              )
+        SELECT _cust_office_id, _date, _date, 'Mbanking',amount_,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+        SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id)
+
+        select _tran_id, deposit.product_gl_account_id(from_acc_),_from_ac_id, amount_, NULL, statement_, _sys_id union all 
+        select _tran_id, _cor_ibt_pay_gl,NULL, NULL, amount_, statement_, _sys_id;
+
+      INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id
+              )
+      SELECT _cor_office_id, _date, _date, 'Mbanking', amount_,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+      SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _rem_tran_id;
+
+			INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id, debit, credit, statement_reference, audit_user_id  )
+
+		select _rem_tran_id, _cor_rem_rec_gl, amount_, NULL, statement_, _sys_id union all 
+        select _rem_tran_id, _to_adv_ac, NULL, amount_, statement_, _sys_id;
+        
+        END IF;
+        	
+	INSERT INTO bsmart.coop_transfer(source_accountnumber, api_user_id , destination_bank, destination_account_name, destination_accountnumber, destination_branch_code, amount, partner_transaction_id, transfer_type,tran_type ,gateway_name,customer_mobile)	
+	SELECT from_acc_, api_user_id_ , destination_bank_, destination_accountname_, destination_accountnumber_, destination_branchcode_, amount_, _tran_id, tran_type_,'Out',gateway_name_,customer_mobile_num_;
+       
+	   RETURN QUERY(select _tran_id);
+
+END
+
+$BODY$;

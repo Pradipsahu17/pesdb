@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS loan.loan_application_guarantee(
+	loan_application_guarantee_id bigserial PRIMARY KEY UNIQUE NOT NULL,
+	tran_date date,
+	application_id bigint REFERENCES loan.loan_application(application_id) NOT NULL,
+	account_number_id bigint REFERENCES deposit.account_holders(account_number_id) NOT NULL,
+	is_dead boolean DEFAULT false,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone NOT NULL DEFAULT now()
+);

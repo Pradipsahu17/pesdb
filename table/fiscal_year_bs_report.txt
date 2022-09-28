@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS core.fiscal_year_bs_report(
+	fiscal_year_bs_id bigint PRIMARY KEY UNIQUE NOT NULL,
+	fy_date date NOT NULL,
+	head character varying,
+	balance money,
+	is_heading integer,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+CREATE OR REPLACE FUNCTION core.insert_fiscal_year_bs_report(
+	office_id_ bigint,
+	user_id_ bigint,
+	till_ date)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	DECLARE _date_ date;
+	BEGIN
+		select fy_date into _date_ from core.fiscal_year_bs_report;
+		IF $3 = _date_
+		THEN
+			RAISE EXCEPTION 'enter new date';
+		ELSE
+			INSERT INTO core.fiscal_year_bs_report (office_id,fy_date, head, balance, is_heading, audit_user_id, audit_ts)
+			SELECT $1,
+				$3,
+				a.head,
+				a.balance,
+				a.is_heading,
+				$2,
+				(select current_timestamp)::timestamp with time zone
+			FROM transactions.get_balance_sheet(1,1,'2021-10-10') a;
+			RETURN true;
+		END IF;
+	END
+$BODY$;

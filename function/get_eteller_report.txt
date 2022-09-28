@@ -1,0 +1,32 @@
+-- 	SELECT * FROM deposit.get_eteller_report(2)
+
+-- 	DROP FUNCTION IF EXISTS deposit.get_eteller_report(integer)
+
+CREATE OR REPLACE FUNCTION deposit.get_eteller_report(
+    office_id_ integer)
+    RETURNS TABLE(sn bigint, tran_id bigint, tran_date character varying, account_number character varying, debit money, credit money,statement_reference character varying)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE  
+AS $BODY$
+    DECLARE _date date := (SELECT core.get_date());
+    BEGIN
+		CREATE TEMP TABLE _t(tran_id bigint, tran_date character varying, account_number character varying, debit money, credit money, statement_reference character varying) ON COMMIT DROP;
+		INSERT INTO _t
+		SELECT t.tran_id, 
+			core.date_bs_from_ad(t.tran_date::date), 
+			a.account_number,
+			t.debit, 
+			t.credit, 
+			t.statement_reference 
+		FROM deposit.transaction_view t
+		INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id
+		WHERE t.tran_date::date = _date
+		AND t.account_number_id = (SELECT s.account_number_id FROM deposit.eteller_setup s WHERE s.office_id = $2);
+		
+		INSERT INTO _t(account_number, debit, credit)
+		SELECT 'Total',SUM(_t.debit),SUM(_t.credit) FROM _t;
+		
+		RETURN QUERY(SELECT ROW_NUMBER() OVER(),* FROM _t);
+    END
+$BODY$;

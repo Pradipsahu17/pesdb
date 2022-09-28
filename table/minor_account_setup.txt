@@ -1,0 +1,120 @@
+CREATE TABLE IF NOT EXISTS core.minor_accounts
+(
+    minor_account_id bigserial PRIMARY KEY UNIQUE NOT NULL,
+	guardian_id bigint REFERENCES core.customers(customer_id) NOT NULL,
+	relation_id integer REFERENCES core.relation(relation_id) NOT NULL,
+    first_name character varying(100) NOT NULL,
+    middle_name character varying(100),
+    last_name character varying(100) NOT NULL,
+    full_name character varying(300),
+	nepali_name character varying(300),
+	cast_id integer REFERENCES core.cast_catagories (cast_id) NOT NULL,
+    gender_id integer REFERENCES core.genders (gender_id) NOT NULL,
+    date_of_birth timestamp without time zone,
+    date_of_birth_bs character varying(10),
+    age integer,
+    birth_place character varying(50),
+    birth_certificate_number character varying(50),
+    birth_certificate_issue_place character varying(50),
+	issued_date character varying,
+    father_name character varying(150),
+    father_contact_number character varying(50),
+    mother_name character varying(150),
+    mother_contact_number character varying(50),
+    cell_number character varying(150),
+    audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+    audit_ts timestamp with time zone NOT NULL DEFAULT now()
+);
+
+
+-- DROP INDEX IF EXISTS core.core_guardian_id_ix;
+
+CREATE INDEX IF NOT EXISTS core_guardian_id_ix
+    ON core.minor_accounts USING btree
+    (guardian_id ASC NULLS LAST)
+    TABLESPACE pg_default;
+
+
+-- DROP INDEX IF EXISTS core.core_minor_accounts_audit_user_id_ix;
+
+CREATE INDEX IF NOT EXISTS core_minor_accounts_audit_user_id_ix
+    ON core.minor_accounts USING btree
+    (audit_user_id ASC NULLS LAST)
+    TABLESPACE pg_default;
+
+
+-- DROP INDEX IF EXISTS core.core_minor_accounts_date_of_birth_ix;
+
+CREATE INDEX IF NOT EXISTS core_minor_accounts_date_of_birth_ix
+    ON core.minor_accounts USING btree
+    (date_of_birth ASC NULLS LAST)
+    TABLESPACE pg_default;
+
+
+-- DROP INDEX IF EXISTS core.core_minor_accounts_gender_id_ix;
+
+CREATE INDEX IF NOT EXISTS core_minor_accounts_gender_id_ix
+    ON core.minor_accounts USING btree
+    (gender_id ASC NULLS LAST)
+    TABLESPACE pg_default;
+
+
+CREATE OR REPLACE FUNCTION core.check_guardian_id_on_minor_accounts()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE NOT LEAKPROOF
+AS $BODY$
+
+
+-- DROP TRIGGER IF EXISTS check_customer_id_on_minor_accounts ON core.minor_accounts;
+
+CREATE TRIGGER check_customer_id_on_minor_accounts
+    BEFORE INSERT OR UPDATE 
+    ON core.minor_accounts
+    FOR EACH ROW
+    EXECUTE FUNCTION core.check_guardian_id_on_minor_accounts();
+BEGIN
+	IF NEW.guardian_id IN (
+		SELECT customer_id FROM core.customers WHERE is_corporate = true
+	) THEN
+		RAISE EXCEPTION '% is not a Personal Customer.', NEW.customer_id;
+	END IF;
+	
+	NEW.audit_ts = NOW();
+	RETURN NEW;
+END
+$BODY$;
+
+	
+CREATE OR REPLACE FUNCTION core.update_customer_full_name_on_minor_accounts()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE NOT LEAKPROOF
+AS $BODY$
+
+DECLARE _minor_acc_id bigint;
+BEGIN
+
+	_minor_acc_id := NEW.minor_account_id;
+	IF(NEW.middle_name IS NOT NULL) THEN
+	UPDATE core.minor_accounts SET full_name = NEW.first_name || ' ' || NEW.middle_name || ' ' || NEW.last_name WHERE minor_account_id = _minor_acc_id;
+	END IF;
+
+	IF(NEW.middle_name IS NULL) THEN
+	UPDATE core.minor_accounts SET full_name = NEW.first_name || ' ' || NEW.last_name WHERE minor_account_id = NEW._minor_acc_id;
+	END IF;
+
+	RETURN NEW;
+END
+$BODY$;
+
+
+-- DROP TRIGGER IF EXISTS update_minor_acc_full_name ON core.minor_accounts;
+
+CREATE TRIGGER update_minor_acc_full_name
+    AFTER INSERT
+    ON core.minor_accounts
+    FOR EACH ROW
+    EXECUTE FUNCTION core.update_customer_full_name_on_minor_accounts();	

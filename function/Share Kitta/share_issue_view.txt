@@ -1,0 +1,20 @@
+-- drop view transactions.share_issue_view
+
+CREATE OR REPLACE VIEW transactions.share_issue_view
+ AS
+	SELECT ROW_NUMBER() OVER(ORDER BY s.share_issue_id),
+		o.office_id,
+		s.share_issue_id,
+		core.date_bs_from_ad(s.issued_date::date),
+		u.user_name AS issued_by,
+		s.issued_units,
+		s.begins_from,
+		uu.user_name AS audit_user
+	FROM transactions.share_issue s
+	INNER JOIN office.users u
+		ON s.issued_by_id = u.user_id
+	INNER JOIN office.users uu
+		ON s.audit_user_id = uu.user_id
+	INNER JOIN office.offices o
+		ON u.office_id = o.office_id	
+	ORDER BY s.share_issue_id; 

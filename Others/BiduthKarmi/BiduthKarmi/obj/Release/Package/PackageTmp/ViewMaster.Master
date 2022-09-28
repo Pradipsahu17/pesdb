@@ -1,0 +1,408 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="ViewMaster.master.cs" Inherits="BiduthKarmi.ViewMaster" %>
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+    <title>
+        <asp:ContentPlaceHolder ID="ContentTitle" runat="server">
+        </asp:ContentPlaceHolder>
+    </title>
+    <link rel="stylesheet" href="assets/css/flexslider.css" />
+    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css" />
+
+    <link rel="stylesheet" href="assets/css/font-awesome.css" />
+    <link href="Admin/vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <asp:ContentPlaceHolder ID="ContentHead" runat="server">
+    </asp:ContentPlaceHolder>
+
+
+</head>
+<body>
+    <div class="container-fluid" style="background-color: #121c55;">
+        <div class="container" style="padding: 5px 0px;">
+            <div class="span6" style="margin: 0px;"><span style="color: white"><i class="icon-phone"></i>&nbsp;&nbsp;<b>014251401, 014258014&nbsp;&nbsp;<i class="icon-home"></i>&nbsp;&nbsp;Bagbazar-28, Kathmandu, Nepal</b></span></div>
+            <div class="span6" style="margin: 0px; float:right;">
+                <ul style="list-style-type: none; color: white; cursor: pointer; float: right; margin: 0px;">
+                    <li class="dropdown">
+                        <div class="dropdown-toggle" data-toggle="dropdown"><i class="icon-refresh"></i>&nbsp;<b>Language</b><span class="caret"></span></div>
+                        <ul class="dropdown-menu">
+                            <li><a href="Default.aspx?type=Nepali"><b>Nepali</b></a></li>
+                            <li><a href="Default.aspx"><b>English</b></a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
+    <%--  <div class="row" style="background-color: #121c55">
+        <div class="span5   offset5" style="text-align: right; font-size: 13px;">
+            <span style="color: white"><i class="icon-phone"></i>&nbsp;&nbsp;<b>014251401,014258014&nbsp;&nbsp;<i class="icon-home"></i>&nbsp;&nbsp;Bagbazar-28,Kathmandu,Nepal</b></span>
+        </div>
+        <div class="span2   offset1">
+            <ul style="list-style-type: none; color: white; cursor: pointer">
+                <li class="dropdown">
+                    <div class="dropdown-toggle" data-toggle="dropdown"><i class="icon-refresh"></i>&nbsp;<b>Language</b><span class="caret"></span></div>
+                    <ul class="dropdown-menu">
+                        <li><a href="Default.aspx?type=Nepali"><b>Nepali</b></a></li>
+                        <li><a href="Default.aspx"><b>English</b></a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>--%>
+
+    <div class="container-fluid" style="background-color: white; padding: 12px 0px;">
+        <div class="container">
+            <div class="row">
+                <div class="span6" style="margin: 0px;">
+                    <a href="Default.aspx">
+                        <img src="images/logo1.jpg" style="width: 365px; margin-left: 28px;" /></a>
+                </div>
+                <div class="span2" style="margin: 0px; float: right; padding-top: 32px;">
+                    <a href="EMICalculate.aspx"><span class="btn btn-success btn-block">EMI Calculator</span></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <%--    <div class="row" style="background-color: white">
+        <div class="span4  offset1" style="padding-top: 10px;">
+            <a href="Default.aspx">
+                <img src="images/logo1.jpg" /></a>
+        </div>
+
+        <%-- <div class="span2" style="padding-top: 50px;">
+           
+           
+            <a href="EMICalculate.aspx"><span class="btn btn-success btn-block">EMI Calculator</span></a>
+             <a href="https://meet.google.com/zqf-xfqx-iuj"target="_blank"><span class="btn btn-primary btn-block">AGM Test Meet</span></a>
+        </div>--%>
+    <%--     <div class="span2 offset6" style="padding-top: 50px;">--%>
+
+
+    <%--  <a href="EMICalculate.aspx"><span class="btn btn-success btn-block">EMI Calculator</span></a>--%>
+    <%--<a href="#"><span class="btn btn-success btn-block">EMI Calculator</span></a>
+        </div>
+
+    </div>--%>
+
+    <div class="container-fluid" style="background-color:#121c55">
+        <div class="container">
+            <nav class="navbar" style="background-color: #121c55;">
+                <ul class="nav navbar-nav">
+                    <li><a href="Default.aspx"><b>Home</b></a></li>
+                    <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>About US</b> <span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+
+                            <li><a href="ChairmanMessage.aspx"><b>Chairman Message</b></a></li>
+                            <li><a href="AboutUs.aspx"><b>About Shakaari</b></a></li>
+                        </ul>
+                    </li>
+                    <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>Services</b><span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li class="menu-item dropdown dropdown-submenu">
+                                <a href="DepositScheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Deposit</b></a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a href="FixDepositScheme.aspx"><b>Fixed  Deposit</b></a>
+
+                                    </li>
+                                    <li>
+                                        <a href="EducationSaving.aspx"><b>Education Saving</b></a>
+                                    </li>
+                                    <li class="menu-item dropdown dropdown-submenu">
+                                        <a href="DepositScheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Saving</b></a>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <a href="NormalSaving.aspx"><b>Normal Saving</b></a>
+                                            </li>
+                                            <li>
+                                                <a href="GeneralSaving.aspx"><b>General Saving</b></a>
+                                            </li>
+
+                                            <li>
+                                                <a href="GoldSaving.aspx"><b>Gold Saving </b></a>
+                                            </li>
+                                            <li>
+                                                <a href="SilverSaving.aspx"><b>Silver Saving</b></a>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li class="menu-item dropdown dropdown-submenu">
+                                <a href="loanscheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Loan</b></a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a href="PersonalLoan.aspx"><b>Personal Loan</b></a>
+                                    </li>
+                                    <li>
+                                        <a href="ShareAgainstLoan.aspx"><b>Share Against Loan</b></a>
+                                    </li>
+                                    <li>
+                                        <a href="HirePurchaseLoan.aspx"><b>Hire Purchase Loan</b></a>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li class="menu-item dropdown dropdown-submenu">
+                                <a href="ShareScheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Share</b></a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a href="ShareScheme.aspx"><b>Normal Share</b></a>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <li><a href="NewsPanel.aspx"><b>News</b></a></li>
+
+                    <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>Downloads</b><span class="caret"></span></a>
+                        <ul class="dropdown-menu" id="downloadsCategory">
+
+                            <%-- <li><a href="Downloads.aspx?id=1"><b>Deposoit Return Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=2"><b>Loan Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=4"><b>Share Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=3"><b>Collector Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=6"><b>Saving Deposoit Form</b></a></li>
+                        <li><a href="Downloads.aspx?id=5"><b>KYM Form</b></a></li>
+                        <li><a href="Downloads.aspx?id=55"><b>All Forms</b></a></li>--%>
+                        </ul>
+                    </li>
+                    <li><a href="ReportAndPublication.aspx"><b>Report&Publications</b></a></li>
+                    <li><a href="Gallary.aspx"><b>Gallery&Events</b></a></li>
+                    <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>Members</b><span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="BoardMembers.aspx"><b>BOD</b></a></li>
+                            <li><a href="AccountCommitte.aspx"><b>Account Committe</b></a></li>
+                            <li><a href="LoanSubmitCommitte.aspx"><b>Loan Submit Committe </b></a></li>
+                            <li><a href="ManagementTeam.aspx"><b>Management Team</b></a></li>
+                        </ul>
+                    </li>
+                    <%--<li><a href="BoardMembers.aspx"><b>Members</b></a></li>--%>
+                    <li style="background-color: red"><a href="#Contact"><b>Contact Us</b></a></li>
+                    <li><a href="Career.aspx"><b>Career</b></a></li>
+                    <li><a href="BranchOffice.aspx"><b>Associate Banks</b></a> </li>
+                    <li><a href="#"><b>Notice</b></a> </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <%--  <nav class="navbar" style="background-color: #121c55;">
+        <div class="container-fluid">
+            <ul class="nav navbar-nav">
+                <li><a href="Default.aspx"><b>Home</b></a></li>
+                <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>About US</b> <span class="caret"></span></a>
+                    <ul class="dropdown-menu">
+
+                        <li><a href="ChairmanMessage.aspx"><b>Chairman Message</b></a></li>
+                        <li><a href="AboutUs.aspx"><b>About Shakaari</b></a></li>
+                    </ul>
+                </li>
+                <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>Services</b><span class="caret"></span></a>
+                    <ul class="dropdown-menu">
+                        <li class="menu-item dropdown dropdown-submenu">
+                            <a href="DepositScheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Deposit</b></a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a href="FixDepositScheme.aspx"><b>Fixed  Deposit</b></a>
+
+                                </li>
+                                <li>
+                                    <a href="EducationSaving.aspx"><b>Education Saving</b></a>
+                                </li>
+                                <li class="menu-item dropdown dropdown-submenu">
+                                    <a href="DepositScheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Saving</b></a>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a href="NormalSaving.aspx"><b>Normal Saving</b></a>
+                                        </li>
+                                        <li>
+                                            <a href="GeneralSaving.aspx"><b>General Saving</b></a>
+                                        </li>
+
+                                        <li>
+                                            <a href="GoldSaving.aspx"><b>Gold Saving </b></a>
+                                        </li>
+                                        <li>
+                                            <a href="SilverSaving.aspx"><b>Silver Saving</b></a>
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="menu-item dropdown dropdown-submenu">
+                            <a href="loanscheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Loan</b></a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a href="PersonalLoan.aspx"><b>Personal Loan</b></a>
+                                </li>
+                                <li>
+                                    <a href="ShareAgainstLoan.aspx"><b>Share Against Loan</b></a>
+                                </li>
+                                <li>
+                                    <a href="HirePurchaseLoan.aspx"><b>Hire Purchase Loan</b></a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="menu-item dropdown dropdown-submenu">
+                            <a href="ShareScheme.aspx" class="dropdown-toggle" data-toggle="dropdown"><b>Share</b></a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a href="ShareScheme.aspx"><b>Normal Share</b></a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+
+                <li><a href="NewsPanel.aspx"><b>News</b></a></li>
+
+                <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>Downloads</b><span class="caret"></span></a>
+                    <ul class="dropdown-menu" id="downloadsCategory">
+
+                        <%-- <li><a href="Downloads.aspx?id=1"><b>Deposoit Return Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=2"><b>Loan Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=4"><b>Share Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=3"><b>Collector Form </b></a></li>
+                        <li><a href="Downloads.aspx?id=6"><b>Saving Deposoit Form</b></a></li>
+                        <li><a href="Downloads.aspx?id=5"><b>KYM Form</b></a></li>
+                        <li><a href="Downloads.aspx?id=55"><b>All Forms</b></a></li>
+                    </ul>
+                </li>
+                <li><a href="ReportAndPublication.aspx"><b>Report&Publications</b></a></li>
+                <li><a href="Gallary.aspx"><b>Gallery&Events</b></a></li>
+                <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#"><b>Members</b><span class="caret"></span></a>
+                    <ul class="dropdown-menu">
+                        <li><a href="BoardMembers.aspx"><b>BOD</b></a></li>
+                        <li><a href="AccountCommitte.aspx"><b>Account Committe</b></a></li>
+                        <li><a href="LoanSubmitCommitte.aspx"><b>Loan Submit Committe </b></a></li>
+                        <li><a href="ManagementTeam.aspx"><b>Management Team</b></a></li>
+                    </ul>
+                </li>
+                <%--<li><a href="BoardMembers.aspx"><b>Members</b></a></li>
+                <li style="background-color: red"><a href="#Contact"><b>Contact Us</b></a></li>
+                <li><a href="Career.aspx"><b>Career</b></a></li>
+                <li><a href="BranchOffice.aspx"><b>Associate Banks</b></a> </li>
+                <li><a href="#"><b>Notice</b></a> </li>
+            </ul>
+        </div>
+    </nav>--%>
+
+    <form id="form1" runat="server">
+        <asp:ContentPlaceHolder ID="ContentBody" runat="server">
+        </asp:ContentPlaceHolder>
+    </form>
+
+    <footer>
+        <div class="container">
+            <div class="container">
+                <div class="row">
+                    <div class="widget span3">
+                        <h4>Important Links</h4>
+
+                        <%--<p><a href="https://ica.coop/"></a></p>--%>
+                        <p><a href="http://www.nea.org.np/">Nepal Electricity Authority</a></p>
+                        <p><a href="http://guffawdecipher.com/">Nepal Stock Exchange</a></p>
+                        <p><a href="http://www.ncdb.org.np/">National Cooperative Exchange Board (NCDP)</a></p>
+                    </div>
+                    <div class="widget span3">
+                        <h4>Office Time</h4>
+                        <p style="color: white; font-weight: bold">
+                            Summer Time:<br />
+                            Sun-Thus:10am-5pm;<br />
+                            Friday:10am-3pm;<br />
+                            Winter Time:<br />
+                            Sun-Thus:10am-4pm;<br />
+                            Friday:10am-3pm;<br />
+                            Closed On Public Holiday 
+                        </p>
+
+                    </div>
+                    <div class="widget span3">
+                        <h4>Web Portol Login</h4>
+                        <a href="Login.aspx" target="_blank">Login</a>
+                    </div>
+                    <div class="widget span3">
+                        <h4>Contact Us</h4>
+                        <p><i class="icon-map-marker"></i>Address: Bagbazar-28,Kathmandu,Nepal</p>
+                        <p><i class="icon-phone"></i>Phone:  014251401,014258014</p>
+                        <p><i class="icon-user"></i>FaceBook: <a href="https://www.facebook.com/biddhutkarmi.sahakari">Biddhutkarmi Sahakari</a></p>
+                        <p><i class="icon-envelope-alt"></i>Email: <a href="#">bkbssl1@gmail.com</a></p>
+                    </div>
+                </div>
+                <div class="footer-border">
+                    <div class="row">
+                        <div class="copyright span4">
+                            <p>Copyright 2020   PES - All rights reserved.</p>
+                        </div>
+                        <div class="social span8">
+                            <a class="facebook" href="https://planetearthsolution.com/" target="_blank"></a>
+                            <a class="dribbble" href="https://planetearthsolution.com/" target="_blank"></a>
+                            <a class="twitter" href="https://planetearthsolution.com/" target="_blank"></a>
+                            <a class="pinterest" href="https://planetearthsolution.com/" target="_blank"></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+
+    <script src="assets/js/jquery-1.8.2.min.js"></script>
+    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="assets/js/jquery.flexslider.js"></script>
+    <script src="Scripts/MessageBox.js"></script>
+
+    <script src="Scripts/jquery.blockUI.js"></script>
+
+    <script>
+        $('ul.dropdown-menu [data-toggle=dropdown]').on('click', function (event) {
+            // Avoid following the href location when clicking
+            event.preventDefault();
+            // Avoid having the menu to close when clicking
+            event.stopPropagation();
+            // If a menu is already open we close it
+            $('ul.dropdown-menu [data-toggle=dropdown]').parent().removeClass('open');
+            // opening the one you clicked on
+            $(this).parent().addClass('open');
+        });
+
+        $(document).live('ready', function () {
+            $.ajax({
+                type: "POST",
+                url: "Downloads.aspx/LoadAavailableDownloads",
+                data: {},
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (result) {
+                    if (result.d.Success == true) {
+                        $("#downloadsCategory").prepend(result.d.AdditionalData);
+                        console.log("This is Developed by Dhananjaya Devkota:9849896722");
+                    }
+                    else {
+                        alert("The DataBase is NULL");
+                    }
+                },
+                failure: function (result) {
+                    alert("Contact to the developer");
+                }
+            });
+        });
+    </script>
+
+    <asp:ContentPlaceHolder ID="ContentScript" runat="server">
+    </asp:ContentPlaceHolder>
+</body>
+</html>

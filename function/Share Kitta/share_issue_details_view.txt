@@ -1,0 +1,11 @@
+CREATE OR REPLACE VIEW transactions.share_issue_details_view
+ AS
+	SELECT ROW_NUMBER() OVER(ORDER BY kitta_no),
+	s.kitta_no,
+	s.share_issue_id,
+	u.user_name,
+	s.status
+	FROM transactions.share_issue_details s
+	INNER JOIN office.users u
+		ON s.audit_user_id = u.user_id
+	ORDER BY s.kitta_no;

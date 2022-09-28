@@ -1,0 +1,30 @@
+-- SELECT * FROM core.get_corporate_receipt(2881530)
+
+CREATE OR REPLACE FUNCTION core.get_corporate_receipt(
+	tran_id_ bigint)
+	RETURNS TABLE(tran_id bigint, user_name character varying, account_number character varying, collector_name character varying, organization_name_np character varying, organization_address_np character varying, cell_number character varying, entry_on timestamp with time zone)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT td.tran_id,
+				u.user_name, 
+				a.account_number, 
+				oc.collector_name , 
+				ccc.nepali_name,
+				ccc.nepali_address,
+				ccc.cell_number, 
+				td.audit_ts 
+			FROM transactions.transaction_details AS td
+			INNER JOIN deposit.account_holders AS a ON a.account_number_id = td.account_number_id
+			LEFT JOIN core.corporate_customers AS ccc ON a.customer_id = ccc.customer_id
+			INNER JOIN office.collectors AS oc on a.collector_id = oc.collector_id
+			INNER JOIN office.users u ON td.audit_user_id = u.user_id
+			WHERE td.account_number_id IS NOT NULL
+			AND td.tran_id = $1
+		);
+	END
+$BODY$;
+			

@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS loan.application_attachments(
+	application_attachments_id bigserial UNIQUE PRIMARY KEY NOT NULL,
+	document_id bigint REFERENCES loan.documents(document_id) NOT NULL,
+	notes character varying NOT NULL,
+	audit_user_id bigint REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS loan_documents_user_id_ix
+ ON loan.application_attachments USING btree
+ (audit_user_id ASC NULLS LAST);
+ 
+ CREATE INDEX IF NOT EXISTS loan_documents_document_id_ix
+ ON loan.application_attachments USING btree
+ (document_id ASC NULLS LAST);

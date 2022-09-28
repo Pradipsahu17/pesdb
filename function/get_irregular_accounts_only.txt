@@ -1,0 +1,112 @@
+-- select * from deposit.get_irregular_accounts_only(0, 0, '2020-10-10', '2020-11-11', '1000')
+
+-- DROP FUNCTION IF EXISTS deposit.get_irregular_accounts_only(integer, integer, integer, date, date, money);
+
+CREATE OR REPLACE FUNCTION deposit.get_irregular_accounts_only(
+	office_id_ integer,
+	deposit_product_id_to_ integer,
+	from_ date,
+	to_ date,
+	amount money)
+    RETURNS TABLE(sn bigint,customer_id bigint, member_name text, acc bigint, acc_no character varying, balance money, credit money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE _t(
+		customer_id bigint, 
+		member_name text,
+		acc bigint,
+		acc_no character varying,
+		balance money,
+		credit money
+	) ON COMMIT DROP;
+
+	IF $1 = 0 THEN
+		IF $2 = 0 THEN
+			INSERT INTO _t(customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_drawing_power(a.account_number_id),
+				SUM(td.credit) AS credit
+			FROM deposit.account_holders a
+			LEFT JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			LEFT JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			WHERE a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,a.office_id,a.customer_id,c.customer_name)t where t.credit <= $5::money;
+		ELSE
+			INSERT INTO _t(customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_drawing_power(a.account_number_id),
+				SUM(td.credit) AS credit
+			FROM deposit.account_holders a
+			LEFT JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			LEFT JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			WHERE a.deposit_product_id = $2
+			AND a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,a.office_id,a.customer_id,c.customer_name)t where t.credit <= $5::money;
+		END IF;
+	ELSE
+		IF $2 = 0 THEN
+			INSERT INTO _t(customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_drawing_power(a.account_number_id),
+				SUM(td.credit) AS credit
+			FROM deposit.account_holders a
+			LEFT JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			LEFT JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			WHERE a.office_id = $1
+			AND a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,a.office_id,a.customer_id,c.customer_name)t where t.credit <= $5::money;
+		ELSE
+			INSERT INTO _t(customer_id, member_name,acc, acc_no, balance, credit)
+			SELECT * FROM (SELECT a.customer_id,
+				c.customer_name,
+				a.account_number_id,
+				a.account_number,
+				deposit.get_drawing_power(a.account_number_id),
+				SUM(td.credit) AS credit
+			FROM deposit.account_holders a
+			LEFT JOIN transactions.transaction_details td
+				ON td.account_number_id = a.account_number_id
+			LEFT JOIN transactions.transactions t
+				ON td.tran_id = t.tran_id
+			INNER JOIN core.customers_view c
+				ON a.customer_id = c.customer_id
+			WHERE a.deposit_product_id = $2
+			AND a.office_id = $1
+			AND a.status = true
+			AND t.tran_date BETWEEN $3 AND $4
+			GROUP BY a.account_number_id,a.office_id,a.customer_id,c.customer_name)t where t.credit <= $5::money;
+		END IF;
+	END IF;
+
+	RETURN QUERY(SELECT ROW_NUMBER() OVER (ORDER BY _t.customer_id),_t.customer_id,_t.member_name,_t.acc,_t.acc_no,_t.balance,_t.credit FROM _t);
+END
+$BODY$;

@@ -1,0 +1,79 @@
+-- FUNCTION: deposit.get_maturing_accounts(integer, date)
+
+-- DROP FUNCTION deposit.get_maturing_accounts(integer, date);
+
+CREATE OR REPLACE FUNCTION deposit.get_maturing_accounts(
+	office_id_ integer,
+	till_ date)
+    RETURNS TABLE(creation_date character varying, account_number character varying, customer_name text, address text, contact text, product character varying, collector character varying, duration integer, maturing_in integer, interest_rate numeric, maturity_date character varying, balance money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+	DECLARE _report_duration int;
+BEGIN
+	SELECT parameter::int INTO _report_duration FROM core.preferences WHERE preference_name = 'Duration for Maturing Accounts Report';
+	
+	IF $1 = 0 THEN
+		RETURN QUERY(
+			SELECT 
+				core.date_bs_from_ad(ac.account_open_date::date) creation_date,
+				ac.account_number,
+				c.customer_name,
+				c.permanent_address,
+				c.contact_number,
+				p.deposit_product_name,
+				col.collector_name,
+				ac.duration_in_days duration,
+				(deposit.get_marurity_date(ac.account_number_id) - till_) maruting_in,
+				ac.interest_rate::numeric,
+				core.date_bs_from_ad(deposit.get_marurity_date(ac.account_number_id)) maturity_date,
+				deposit.get_balance(ac.account_number_id, till_)
+			FROM deposit.account_holders ac  
+			INNER JOIN core.customers_view c
+				ON ac.customer_id = c.customer_id
+			INNER JOIN core.deposit_products p
+				ON ac.deposit_product_id = p.deposit_product_id
+			LEFT JOIN office.collectors col
+				ON ac.collector_id = col.collector_id
+			WHERE ac.status = true
+			AND duration_in_days > 0
+			and ac.deposit_product_id in (select deposit_product_id from core.deposit_products where is_term_deposit is true) 
+			AND deposit.get_marurity_date(ac.account_number_id) <= till_ + _report_duration
+			ORDER BY maruting_in
+		);
+	ELSE
+		RETURN QUERY(
+			SELECT 
+				core.date_bs_from_ad(ac.account_open_date::date) creation_date,
+				ac.account_number,
+				c.customer_name,
+				c.permanent_address,
+				c.contact_number,
+				p.deposit_product_name,
+				col.collector_name,
+				ac.duration_in_days duration,
+				(deposit.get_marurity_date(ac.account_number_id) - till_) maruting_in,
+				ac.interest_rate::numeric,
+				core.date_bs_from_ad(deposit.get_marurity_date(ac.account_number_id)) maturity_date,
+				deposit.get_balance(ac.account_number_id, till_)
+			FROM deposit.account_holders ac  
+			INNER JOIN core.customers_view c
+				ON ac.customer_id = c.customer_id
+			INNER JOIN core.deposit_products p
+				ON ac.deposit_product_id = p.deposit_product_id
+			LEFT JOIN office.collectors col
+				ON ac.collector_id = col.collector_id
+			WHERE ac.office_id = office_id_
+			AND ac.status = true
+			AND duration_in_days > 0
+			and ac.deposit_product_id in (select deposit_product_id from core.deposit_products where is_term_deposit is true) 
+			AND deposit.get_marurity_date(ac.account_number_id) <= till_ + _report_duration
+			ORDER BY maruting_in
+		);
+	END IF;
+END
+$BODY$;

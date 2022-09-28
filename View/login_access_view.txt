@@ -1,0 +1,18 @@
+CREATE OR REPLACE VIEW policies.login_access_view
+ AS
+ SELECT l.login_access_id,
+ 		l.office_id,
+		u.office_name,
+ 		l.user_id,
+		u.user_name,
+		u.role_name,
+		l.hours_from,
+		l.hours_to,
+		l.access_from,
+		l.access_to,
+		l.holiday_access,
+		l.status,
+		l.audit_user_id,
+		l.audit_ts
+	FROM policies.login_access l
+	INNER JOIN office.users_view u ON l.user_id = u.user_id;

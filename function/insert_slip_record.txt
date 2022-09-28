@@ -1,0 +1,35 @@
+-- select * from deposit.insert_slip_record(2, 1, 1, 100)
+
+-- select * from deposit.slip_record
+
+CREATE OR REPLACE FUNCTION deposit.insert_slip_record(
+	office_id_ bigint,
+	user_id_ bigint,
+	start_number_ int,
+	end_number_ int)
+	RETURNS void
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _counter int = $3;
+	BEGIN
+		IF 
+			$1 IN (SELECT office_id FROM office.offices) AND
+			$2 IN (SELECT user_id FROM office.users) AND
+			$3 > (SELECT CASE WHEN (SELECT MAX(slip_record_id) FROM deposit.slip_record) IS NOT NULL THEN (SELECT MAX(slip_record_id) FROM deposit.slip_record) ELSE 0 END) AND
+			$3 < $4
+		THEN
+			LOOP
+				INSERT INTO deposit.slip_record(slip_record_id, office_id, audit_user_id)
+				VALUES (_counter,$1,$2);
+
+				_counter := _counter + 1;
+				EXIT WHEN _counter > $4;
+			END LOOP;
+		ELSE
+			RAISE EXCEPTION 'ERROR DATA ENTRY!!';
+		END IF;
+	END
+$BODY$;
+

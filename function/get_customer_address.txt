@@ -1,0 +1,25 @@
+-- FUNCTION: core.get_address(bigint)
+
+-- DROP FUNCTION IF EXISTS core.get_address(bigint);
+
+CREATE OR REPLACE FUNCTION core.get_address(
+	customer_id_ bigint)
+    RETURNS TABLE(customer_address text) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	BEGIN
+		IF (SELECT temporary_address FROM core.customers_view c WHERE c.customer_id=$1)= ''
+		THEN
+			RETURN QUERY(SELECT c.permanent_address FROM core.customers_view c WHERE c.customer_id=$1);
+		ELSE
+			RETURN QUERY(SELECT c.temporary_address FROM core.customers_view c WHERE c.customer_id=$1);
+		END IF;
+	END
+$BODY$;
+
+ALTER FUNCTION core.get_address(bigint)
+    OWNER TO postgres;

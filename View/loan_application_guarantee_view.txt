@@ -1,0 +1,21 @@
+CREATE OR REPLACE VIEW loan.loan_application_guarantee_view
+ AS
+	SELECT a.office_id,
+		o.office_name,
+		g.loan_application_guarantee_id,
+		g.tran_date,
+		g.application_id,
+		c.customer_name,
+		c.contact_number,
+		c.permanent_address,
+		a.account_number,
+		g.account_number_id,
+		g.is_dead,
+		g.audit_user_id 
+	FROM loan.loan_application_guarantee g
+	INNER JOIN deposit.account_holders a 
+		ON g.account_number_id = a.account_number_id
+	INNER JOIN core.customers_view c 
+		ON a.customer_id = c.customer_id
+	INNER JOIN office.offices o
+		ON a.office_id = o.office_id;

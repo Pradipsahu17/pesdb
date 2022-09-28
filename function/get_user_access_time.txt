@@ -1,0 +1,17 @@
+CREATE OR REPLACE FUNCTION policies.get_user_access_time(
+	user_id_ bigint)
+	RETURNS TABLE(user_id bigint, time_from time without time zone, time_to time without time zone)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT l.user_id,
+			l.hours_from,
+			l.hours_to
+			FROM policies.login_access l 
+			WHERE l.user_id = 2
+		);
+	END
+$BODY$;

@@ -1,0 +1,21 @@
+CREATE OR REPLACE FUNCTION office.update_user_status(
+ 	user_id_ bigint,
+ 	json_data_ json,
+ 	status_ boolean)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		IF $1 IN (select user_id from office.users where is_super_user='true') THEN 
+			CREATE TEMP TABLE t_(username character varying) on commit drop;
+			insert into t_
+			select * from json_populate_recordset(null::t_,$2);
+			update office.users  set is_active = $3 where user_name in (select * from t_);
+			RETURN true;
+		ELSE
+			RETURN false;
+		END IF;
+	END
+$BODY$;

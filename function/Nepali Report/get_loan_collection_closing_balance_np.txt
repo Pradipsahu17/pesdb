@@ -1,0 +1,66 @@
+CREATE OR REPLACE FUNCTION loan.get_loan_collection_closing_balance_np(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	product_ character varying,
+	unit_ character varying)
+    RETURNS TABLE(customer_id bigint, account_number character varying, customer_name text, address text, contact text, product character varying, unit character varying, opening money, debit money, credit money, balance money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+	
+BEGIN
+	CREATE TEMP TABLE _tb(loan_id bigint, customer_id bigint, account_number character varying(50), customer_name text, address text, contact text, product character varying(150), unit character varying(150), 
+		opening money, debit money, credit money, balance money) ON COMMIT DROP;
+
+	INSERT INTO _tb(loan_id, customer_id, account_number, customer_name, address, contact, product, unit)
+	SELECT a.loan_id, 
+		a.customer_id, 
+		a.loan_account_number, 
+		c.nepali_name, 
+		c.nepali_address, 
+		c.contact_number, 
+		p.loan_product_name, 
+		c.unit_name
+	FROM loan.loan_grant a
+	INNER JOIN loan.loan_products p 
+		ON a.loan_product_id = p.loan_product_id
+	INNER JOIN core.customers_view c 
+		ON a.customer_id = c.customer_id
+	--INNER JOIN core.get_address(ac.customer_id) g
+		--ON g.customer_id = a.customer_id
+	WHERE a.office_id = office_id_
+	GROUP BY a.loan_id, a.customer_id, a.loan_account_number, c.nepali_name, c.nepali_address, c.contact_number, p.loan_product_name, c.unit_name;
+
+	IF unit_ <> '' THEN
+		DELETE FROM _tb WHERE _tb.unit <> unit_;
+	END IF;
+	
+	IF product_ <> '' THEN
+		DELETE FROM _tb WHERE _tb.product <> product_;
+	END IF;
+
+	UPDATE _tb SET opening = t.bal FROM (
+	SELECT v.loan_id, SUM(COALESCE(v.credit, '0')) - SUM(COALESCE(v.debit, '0')) bal
+	FROM loan.collection_transaction_view v WHERE v.tran_date < from_ GROUP BY v.loan_id
+	) t WHERE t.loan_id = _tb.loan_id;
+
+	UPDATE _tb SET debit = t.dr, credit = t.cr FROM (
+	SELECT v.loan_id, SUM(COALESCE(v.debit, '0')) dr, SUM(COALESCE(v.credit, '0')) cr
+	FROM loan.collection_transaction_view v WHERE v.tran_date BETWEEN from_ AND to_ GROUP BY v.loan_id
+	) t WHERE t.loan_id = _tb.loan_id;
+	
+	UPDATE _tb SET balance = COALESCE(_tb.opening, '0') + COALESCE(_tb.credit, '0') - COALESCE(_tb.debit, '0');
+	INSERT INTO _tb(customer_name, opening, debit, credit, balance) 
+	SELECT '		Total', SUM(COALESCE(_tb.opening, '0')), SUM(COALESCE(_tb.debit, '0')), SUM(COALESCE(_tb.credit, '0')), SUM(COALESCE(_tb.balance, '0')) FROM _tb;
+	DELETE FROM _tb WHERE _tb.balance = '0';
+	
+	RETURN QUERY(SELECT _tb.customer_id, _tb.account_number, _tb.customer_name, _tb.address, _tb.contact, _tb.product, 
+	_tb.unit, _tb.opening, _tb.debit, _tb.credit, _tb.balance FROM _tb ORDER BY _tb.account_number);
+
+END
+$BODY$;

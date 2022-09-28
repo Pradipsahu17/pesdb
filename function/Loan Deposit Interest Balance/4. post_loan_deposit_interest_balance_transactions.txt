@@ -1,0 +1,198 @@
+-- FUNCTION: transactions.post_loan_deposit_interest_balance_transactions(integer, date, bigint)
+
+-- DROP FUNCTION IF EXISTS transactions.post_loan_deposit_interest_balance_transactions(integer, date, bigint);
+
+CREATE OR REPLACE FUNCTION transactions.post_loan_deposit_interest_balance_transactions(
+	user_id_ integer,
+	to_ date,
+	loan_deposit_interest_balance_gl_acc bigint)
+    RETURNS TABLE(office_id integer, tran_id bigint) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE count_ integer := (SELECT COUNT((SELECT o.office_id FROM core.loan_deposit_interest_balance o GROUP BY o.office_id)));
+	DECLARE office_id_ integer := (SELECT o.office_id FROM office.offices o WHERE parent_office_id IS NULL);
+	DECLARE _tran_id bigint;
+	DECLARE _tran_id_b bigint;
+	DECLARE i integer := 1;
+	DECLARE _office_id integer;
+	DECLARE branch_gl_ bigint:= (SELECT local_receivable_gl_account_id FROM core.ibt_setup WHERE local_office_id = office_id_ LIMIT 1);
+	DECLARE _tax_gl_acc bigint:= (SELECT g.gl_account_id FROM core.gl_accounts g WHERE account_name = 'Patronized Tax Account');
+	BEGIN
+		IF count_ > 1 THEN
+			
+--  SELECT * FROM core.loan_deposit_interest_balance ORDER BY customer_id
+
+--  SELECT * from transactions.post_loan_deposit_interest_balance_transactions(1, '2021-10-10',45)
+
+			INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+			select office_id_, $2, $2, 'Loan-Deposit Interest Balance', 'Vouchers', o.amt, 0, 1, 0, 0
+			from (SELECT sum(coalesce(totalbonus,'0'))amt from core.loan_deposit_interest_balance
+			where postacc is not null)o;
+
+			SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+			-- totalbonus
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, debit, statement_reference, audit_user_id)
+			select _tran_id, $3, o.amt, 'Loan-Deposit Interest Balance', $1
+			from (SELECT sum(coalesce(totalbonus,'0'))amt from core.loan_deposit_interest_balance
+			where postacc is not null)o;
+
+			-- tax
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, _tax_gl_acc, o.amt, 'Loan-Deposit Interest Balance', $1
+			FROM (SELECT SUM(COALESCE(tax,'0'))amt FROM core.loan_deposit_interest_balance
+			WHERE postacc IS NOT null)o;
+
+			-- net
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, o.gl, o.amt, 'Loan-Deposit Interest Balance', 0
+			FROM (SELECT l.office_id, s.local_payable_gl_account_id gl,SUM(COALESCE(net,'0'))amt FROM core.loan_deposit_interest_balance l
+			INNER JOIN core.ibt_setup s ON l.office_id = s.local_office_id
+			WHERE postacc IS NOT null
+			AND remote_office_id = office_id_
+			GROUP BY l.office_id,s.local_payable_gl_account_id
+			ORDER BY office_id)o
+			, transactions.transactions t
+			WHERE t.tran_id= _tran_id;
+
+			--Personal_transaction_in_corporate_office
+			INSERT INTO transactions.transaction_details(tran_id,share_account_id ,account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, null,a.account_number_id,p.gl_account_id,  d.totalbonus, 'Loan-Deposit Interest Balance '|| d.postacc,0
+			FROM core.loan_deposit_interest_balance d
+			INNER JOIN deposit.account_holders a ON d.postacc = a.account_number
+			INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+			WHERE d.postacc is not null
+			AND d.office_id= office_id_;
+
+			-- Head Office transactions
+			INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+			select office_id_, $2, $2, 'Loan-Deposit Interest Balance', 'Vouchers', o.amt, 0, 1, 0, 0
+			from (SELECT sum(coalesce(totalbonus,'0'))amt from core.loan_deposit_interest_balance
+			where postacc is not null)o;
+
+			SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+			-- totalbonus
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, debit, statement_reference, audit_user_id)
+			select _tran_id, $3, o.amt, 'Loan-Deposit Interest Balance', $1
+			from (SELECT sum(coalesce(totalbonus,'0'))amt from core.loan_deposit_interest_balance
+			where postacc is not null)o;
+
+			-- tax
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, _tax_gl_acc, o.amt, 'Loan-Deposit Interest Balance', $1
+			FROM (SELECT SUM(COALESCE(tax,'0'))amt FROM core.loan_deposit_interest_balance
+			WHERE postacc IS NOT null)o;
+
+			-- net
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, o.gl, o.amt, 'Loan-Deposit Interest Balance', 0
+			FROM (SELECT l.office_id, s.local_payable_gl_account_id gl,SUM(COALESCE(net,'0'))amt FROM core.loan_deposit_interest_balance l
+			INNER JOIN core.ibt_setup s ON l.office_id = s.local_office_id
+			WHERE postacc IS NOT null
+			AND remote_office_id = office_id_
+			GROUP BY l.office_id,s.local_payable_gl_account_id
+			ORDER BY office_id)o
+			, transactions.transactions t
+			WHERE t.tran_id= _tran_id;
+
+			--Personal_transaction_in_corporate_office
+			INSERT INTO transactions.transaction_details(tran_id,share_account_id ,account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, null,a.account_number_id,p.gl_account_id,  d.totalbonus, 'Loan-Deposit Interest Balance '|| d.postacc,0
+			FROM core.loan_deposit_interest_balance d
+			INNER JOIN deposit.account_holders a ON d.postacc = a.account_number
+			INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+			WHERE d.postacc is not null
+			AND d.office_id= office_id_;
+
+			-- Transaction Table 
+
+			CREATE TABLE IF NOT EXISTS transactions.ldi_transactions(order_id integer, office_id integer, tran_id bigint);
+			DELETE FROM transactions.ldi_transactions;
+			INSERT INTO transactions.ldi_transactions(order_id,office_id, tran_id)
+			SELECT ROW_NUMBER() OVER (ORDER BY o.office_id),o.office_id, 0 
+			FROM office.offices o
+			WHERE parent_office_id IS NOT null
+			ORDER BY office_id;
+	-- 		select * from transactions.ldi_transactions
+
+			-- 	FOR BRANCH 
+			LOOP
+				SELECT _t.office_id INTO _office_id FROM transactions.ldi_transactions _t WHERE _t.order_id = i;
+
+				-- transactions
+				INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+				SELECT _office_id, $2, $2, 'Patronized Fund', 'Vouchers', o.amt, 0, 1, 0, 0
+				FROM (SELECT sum(coalesce(net,'0'))amt FROM core.loan_deposit_interest_balance d
+				WHERE postacc IS NOT null
+				AND d.office_id = _office_id)o;
+
+				SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id_b;
+				UPDATE  transactions.ldi_transactions _t SET tran_id = _tran_id_B WHERE _t.office_id = _office_id;
+
+				-- dr
+				INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, debit, statement_reference, audit_user_id)
+				SELECT _tran_id_b, branch_gl_, o.amt, 'Patronized Fund', $1
+				FROM (SELECT sum(coalesce(net,'0'))amt FROM core.loan_deposit_interest_balance d
+				WHERE d.postacc IS NOT null
+				AND d.office_id = _office_id)o;
+
+				-- cr
+				INSERT INTO transactions.transaction_details(tran_id,share_account_id ,account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+				SELECT _tran_id_b, null, a.account_number_id, p.gl_account_id, d.net, 'Patronized Fund '|| d.postacc,0
+				FROM core.loan_deposit_interest_balance d
+				INNER JOIN deposit.account_holders a ON d.postacc = a.account_number
+				INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+				WHERE d.postacc IS NOT null
+				AND d.office_id= _office_id;
+
+				i := i + 1;
+
+				EXIT WHEN i > (SELECT count(order_id) FROM transactions.ldi_transactions);
+			END LOOP;
+
+			INSERT INTO transactions.ldi_transactions(order_id, office_id, tran_id) 
+			SELECT ROW_NUMBER() OVER (ORDER BY office_id), office_id_, _tran_id;
+
+			RETURN QUERY(SELECT _t.office_id, _t.tran_id FROM transactions.ldi_transactions _t ORDER BY _t.office_id);
+
+	ELSE
+			SELECT l.office_id INTO _office_id FROM core.loan_deposit_interest_balance l GROUP BY l.office_id;
+
+			-- For Single office	
+			INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+			select _office_id, $2, $2, 'Patronized Fund', 'Vouchers', o.amt, 0, 1, 0, 0
+			from (SELECT sum(coalesce(totalbonus,'0'))amt from core.loan_deposit_interest_balance
+			where postacc is not null)o;
+
+			SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+			-- totalbonus
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, debit, statement_reference, audit_user_id)
+			select _tran_id, $3, o.amt, 'Patronized Fund', $1
+			from (SELECT sum(coalesce(totalbonus,'0'))amt from core.loan_deposit_interest_balance
+			where postacc is not null)o;
+
+			-- tax
+			INSERT INTO transactions.transaction_details(tran_id,  gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, _tax_gl_acc, o.amt, 'Patronized Fund', $1
+			FROM (SELECT SUM(COALESCE(tax,'0'))amt FROM core.loan_deposit_interest_balance
+			WHERE postacc IS NOT null)o;
+
+			-- net
+			INSERT INTO transactions.transaction_details(tran_id,share_account_id ,account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+			SELECT _tran_id, null,a.account_number_id,p.gl_account_id,  d.net, 'Patronized Fund '|| d.postacc,0
+			FROM core.loan_deposit_interest_balance d
+			INNER JOIN deposit.account_holders a ON d.postacc = a.account_number
+			INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+			WHERE d.postacc is not null
+			AND d.office_id= office_id_;
+			
+			RETURN QUERY(SELECT _office_id,_tran_id);
+	END IF;
+	END
+$BODY$;

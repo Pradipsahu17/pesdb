@@ -1,0 +1,39 @@
+CREATE OR REPLACE FUNCTION core.get_share_transaction_report_sn(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	trans_type_ character varying,
+	product_id_ integer,
+	user_id_ integer,
+	ibt_type_ smallint,
+	cash_type_ smallint)
+    RETURNS TABLE(SN bigint, tran_id bigint, account_no character varying, product character varying, name text, address text, contact text, tran_date character varying, value_date character varying, debit money, credit money, reference text, entry_by character varying, office_code character varying, is_cash boolean)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+		RETURN QUERY(
+			SELECT row_number() over () as "SN", 
+				t.tran_id "Tran Id", 
+				a.account_number "Account No.", 
+				p.share_product_name "Product", 
+				c.customer_name "Name", 
+				c.permanent_address "Address", 
+				c.contact_number "Contact", 
+				core.date_bs_from_ad(t.tran_date) "Tran Date", 
+				core.date_bs_from_ad(t.value_date) "Value Date", 
+				t.debit "Debit", t.credit "Credit",
+				t.statement_reference "Reference", 
+				u.user_name "Entry By", 
+				transactions.get_office_code(t.ibt_tran_id) "Office code", 
+				transactions.is_cash_tran(t.tran_id) "Is cash" 
+			FROM core.get_share_transaction_report($1,$2, $3, $4, $5, $6, $7, $8) t 
+			INNER JOIN core.share_accounts a ON t.share_account_id = a.share_account_id INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+			INNER JOIN core.share_products p ON a.share_product_id = p.share_product_id 
+			LEFT JOIN office.users u ON t.user_id = u.user_id  
+			UNION ALL SELECT NULL, NULL, NULL, NULL, '        Total', NULL, NULL, NULL, NULL, SUM(COALESCE(t.debit, 0::money)), SUM(COALESCE(t.credit, 0::money)), NULL, NULL, 
+			NULL, NULL FROM core.get_share_transaction_report($1,$2, $3, $4, $5, $6, $7, $8) t
+		);
+END
+$BODY$;

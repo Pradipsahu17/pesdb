@@ -1,0 +1,30 @@
+-- SELECT * FROM transactions.get_transaction_status(57)
+
+CREATE OR REPLACE FUNCTION transactions.get_transaction_status(
+	tran_id_ bigint)
+	RETURNS TABLE(tran_id bigint, office_code character varying, tran_date character varying, value_date character varying, book_name character varying, total_amount money, entry_by character varying, voucher_posted_by character varying, flagged_by character varying, instrument text, is_flagged boolean, status character varying, verified_by character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT t.tran_id, 
+				t.office_code, 
+				core.date_bs_from_ad(t.tran_date::date), 
+				core.date_bs_from_ad(t.value_date::date), 
+				t.book_name, 
+				t.total_amount::money, 
+				t.entry_by, 
+				t.voucher_posted_by, 
+				t.flagged_by, 
+				t.instrument, 
+				t.is_flagged, 
+				v.verification_status_name, 
+				t.verified_by  
+			FROM transactions.transactions_verification_view t 
+			INNER JOIN core.verification_statuses v ON t.verification_status_id = v.verification_status_id
+			WHERE t.tran_id = $1
+		);
+	END
+$BODY$;

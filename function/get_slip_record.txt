@@ -1,0 +1,17 @@
+-- select * from deposit.get_slip_record(2)
+
+CREATE OR REPLACE FUNCTION deposit.get_slip_record(
+	office_id_ bigint)
+	RETURNS TABLE(slip_record_id bigint)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT s.slip_record_id 
+			FROM deposit.slip_record s
+			order by slip_record_id ASC limit 5
+		);
+	END
+$BODY$;

@@ -1,0 +1,32 @@
+-- Table: transactions.share_issue_details
+
+-- DROP TABLE IF EXISTS transactions.share_issue_details;
+
+CREATE TABLE IF NOT EXISTS transactions.share_issue_details
+(
+    kitta_no integer NOT NULL,
+    share_issue_id bigint NOT NULL,
+    audit_user_id integer NOT NULL,
+    audit_ts timestamp with time zone NOT NULL DEFAULT now(),
+    status boolean NOT NULL DEFAULT true,
+    CONSTRAINT share_issue_details_pkey PRIMARY KEY (kitta_no),
+    CONSTRAINT share_issue_details_audit_user_id_fkey FOREIGN KEY (audit_user_id)
+        REFERENCES office.users (user_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT share_issue_details_share_issue_id_fkey FOREIGN KEY (share_issue_id)
+        REFERENCES transactions.share_issue (share_issue_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+)
+
+TABLESPACE pg_default;
+
+-- Index: transactions_share_issue_details_share_issue_id_ix
+
+-- DROP INDEX IF EXISTS transactions.transactions_share_issue_details_share_issue_id_ix;
+
+CREATE INDEX IF NOT EXISTS transactions_share_issue_details_share_issue_id_ix
+    ON transactions.share_issue_details USING btree
+    (share_issue_id ASC NULLS LAST)
+    TABLESPACE pg_default;

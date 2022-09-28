@@ -1,0 +1,138 @@
+-- View: core.non_corporate_customers_view
+
+-- DROP VIEW core.non_corporate_customers_view;
+
+CREATE OR REPLACE VIEW core.non_corporate_customers_view
+ AS
+ SELECT c.customer_id,
+    c.office_id,
+    c.date_of_application,
+    'Personal Customer'::text AS type_of_customer,
+    NULL::character varying AS organization_type_name,
+    array_to_string(array_agg(n.full_name), ', '::text) AS customer_name,
+    array_to_string(array_agg(n.permanent_address), ', '::text) AS permanent_address,
+    n.permanent_address_zone,
+    n.permanent_address_district,
+    n.ward_number AS per_ward_number,
+    mn.municipality_name temp_,
+    n.permanent_address_country,
+    array_to_string(array_agg(n.temporary_address), ', '::text) AS temporary_address,
+    n.temporary_address_zone,
+    n.temporary_address_district,
+    n.temp_ward_number,
+    tmn.municipality_name AS temp_municipality_name,
+    n.temporary_address_country,
+    n.resident_type_id,
+    n.residence_number,
+    r.resident_type_name,
+    array_to_string(array_agg(n.cell_number), ', '::text) AS contact_number,
+    n.email_address,
+    n.employer_name,
+    n.employer_registration_office,
+    n.employer_branch,
+    n.employer_contact,
+    n.designation,
+    n.employer_fax,
+    n.employer_email,
+    n.employer_url,
+    n.heir_name,
+    n.heir_address,
+    n.heir_contact,
+    n.heir_relation,
+    c.is_residential,
+    array_to_string(array_agg(n.date_of_birth), ', '::text) AS date_of_birth,
+    n.age,
+    n.birth_place,
+    n.citizenship_number,
+    n.citizenship_issue_place,
+    n.driving_license_number,
+    n.driving_license_place,
+    n.driving_license_issue_date,
+    n.driving_license_expiry_date,
+    n.passport_number,
+    n.passport_issue_place,
+    n.passport_issue_date,
+    n.passport_expiry_date,
+    n.voter_id_number,
+    n.voting_place,
+    n.occupation,
+    n.introduced_by_name,
+    n.introducer_account_number,
+    n.introducer_bank_name,
+    c.is_minor,
+    u.unit_name,
+    array_to_string(array_agg(g.gender_name), ', '::text) AS gender_name,
+    m.marital_status_name AS marital_status,
+    c.status,
+    n.spouse_name,
+    n.spouse_contact_number,
+    array_to_string(array_agg(n.father_name), ', '::text) AS father_name,
+    n.father_name_np,
+    n.father_contact_number,
+    n.mother_name,
+    n.mother_contact_number,
+    array_to_string(array_agg(n.grand_father_name), ', '::text) AS grand_father_name,
+    n.grand_father_name_np,
+    n.grand_father_contact_number,
+    array_to_string(array_agg(n.nominee_name), ', '::text) AS nominee_name,
+    array_to_string(array_agg(n.nominee_address), ', '::text) AS nominee_address,
+    array_to_string(array_agg(n.nominee_contact), ', '::text) AS nominee_contact,
+    array_to_string(array_agg(n.nominee_relation), ', '::text) AS nominee_relation,
+    n.nepali_name::text AS nepali_name,
+    n.nepali_address::text AS nepali_address,
+    n.national_identity_number,
+    n.personal_pan_number,
+    n.ward_number,
+    n.municipality_name,
+    n.date_of_birth_bs,
+    n.issued_date,
+    cc.cast_name,
+    n.sons,
+    n.daughters,
+    q.qualification_name,
+    n.income_source_id,
+    n.annual_income,
+    n.assumption_transaction_amount,
+    h.hpd_name,
+    h.hpd_relation,
+    h.post_name,
+    mc.cooperative_name_sf,
+    mc.cooperative_name_np_sf,
+    mc.cooperative_address_sf,
+    mc.notes_sf,
+    f.fmc_family_member_name,
+    f.fmc_relation,
+    f.fmc_cooperative_name,
+    f.fmc_cooperative_name_np,
+    f.fmc_address,
+    fi.company_name,
+    fi.company_name_np,
+    fi.f_notes,
+    fi.average_monthly_income,
+    fi.average_yearly_income,
+    fi.company_address,
+    fi.f_relation,
+    fi.f_family_member_name,
+    n.house_owner,
+    n.house_owner_contact,
+    n.number_of_transactions_deposit_annually,
+    n.number_of_transactions_withdraw_annually
+   FROM core.non_corporate_customers n
+     JOIN core.customers c ON n.customer_id = c.customer_id
+     JOIN core.genders g ON n.gender_id = g.gender_id
+     JOIN core.cast_catagories cc ON n.cast_id = cc.cast_id
+     LEFT JOIN core.qualifications q ON n.qualification_id = q.qualification_id
+     LEFT JOIN office.units u ON c.unit_id = u.unit_id
+     LEFT JOIN core.resident_type r ON n.resident_type_id = r.resident_type_id
+     JOIN core.marital_status m ON n.marital_status_id = m.marital_status_id
+     LEFT JOIN core.high_post_detail h ON n.customer_id = h.customer_id
+     LEFT JOIN core.multi_cooperative mc ON n.customer_id = mc.customer_id
+     LEFT JOIN core.family_multi_cooperative f ON n.customer_id = f.customer_id
+     LEFT JOIN core.family_income fi ON n.customer_id = fi.customer_id
+	 LEFT JOIN core.municipality mn ON n.municipality_name::integer = mn.municipality_id
+	 LEFT JOIN core.municipality tmn ON n.temp_municipality_name::integer = tmn.municipality_id
+  GROUP BY c.customer_id, c.office_id, c.date_of_application, n.permanent_address_zone, n.permanent_address_district, n.permanent_address_country,mn.municipality_name, n.temporary_address_zone, n.temporary_address_district, n.temp_ward_number, tmn.municipality_name, n.temporary_address_country, n.resident_type_id, n.residence_number, n.email_address, n.employer_name, n.employer_registration_office, n.employer_branch, n.employer_contact, n.designation, n.employer_fax, n.employer_email, n.employer_url, n.heir_name, n.heir_address, n.heir_contact, n.heir_relation, c.is_residential, r.resident_type_name, n.birth_place, n.citizenship_number, n.citizenship_issue_place, n.driving_license_number, n.driving_license_place, n.driving_license_issue_date, n.driving_license_expiry_date, n.passport_number, n.passport_issue_place, n.passport_issue_date, n.passport_expiry_date, n.occupation, n.introduced_by_name, n.introducer_account_number, n.introducer_bank_name, c.is_minor, u.unit_name, m.marital_status_name, c.status, n.spouse_name, n.spouse_contact_number, n.father_contact_number, n.mother_name, n.mother_contact_number, n.grand_father_contact_number, n.nepali_name, n.nepali_address, n.national_identity_number, n.personal_pan_number, n.voter_id_number, n.voting_place, n.ward_number, n.municipality_name, n.date_of_birth_bs, n.age, n.issued_date, cc.cast_name, n.sons, n.daughters, q.qualification_name, n.income_source_id, n.annual_income, n.assumption_transaction_amount, h.hpd_name, h.hpd_relation, h.post_name, mc.cooperative_name_sf, mc.cooperative_name_np_sf, mc.notes_sf, mc.cooperative_address_sf, f.fmc_family_member_name, f.fmc_relation, f.fmc_cooperative_name, f.fmc_cooperative_name_np, f.fmc_address, fi.company_name, fi.company_name_np, fi.f_notes, fi.average_monthly_income, fi.average_yearly_income, fi.company_address, fi.f_relation, fi.f_family_member_name, n.father_name_np, n.grand_father_name_np, n.house_owner, n.house_owner_contact, n.number_of_transactions_deposit_annually, n.number_of_transactions_withdraw_annually;
+
+ALTER TABLE core.non_corporate_customers_view
+    OWNER TO postgres;
+

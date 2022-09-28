@@ -1,0 +1,34 @@
+CREATE OR REPLACE FUNCTION office.get_employee_details(
+	office_id_ bigint)
+	RETURNS TABLE(office_id integer, employee_name character varying(250), salary money, allowance money, account_number character varying(50))
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		IF $1 = 0 
+		THEN
+			RETURN QUERY(
+				SELECT e.office_id, 
+				e.employee_name, 
+				e.salary, 
+				e.allowance, 
+				e.account_number 
+				FROM office.employee_info_view e);
+		
+		ELSE 
+			IF $1 IN (SELECT o.office_id FROM office.offices o)
+			THEN
+				RETURN QUERY(
+					SELECT e.office_id, 
+					e.employee_name, 
+					e.salary, 
+					e.allowance, 
+					e.account_number 
+					FROM office.employee_info_view e WHERE e.office_id = $1);
+			ELSE
+				RAISE EXCEPTION 'ERROR DATA ENTRY!!';
+			END IF;
+		END IF;
+	END
+$BODY$;

@@ -1,0 +1,32 @@
+CREATE OR REPLACE FUNCTION deposit.get_fd_transfer_report(
+	office_id_ integer,
+	from_ date,
+	to_ date)
+    RETURNS TABLE(tran_id bigint, office_id integer, tran_date character varying, account_number character varying, book_name character varying, amount money, nominee_account_number_id bigint) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+IF office_id_>0 THEN
+RETURN QUERY(
+SELECT t.tran_id, a.office_id, c.date_in_bs, a.account_number, t.book_name, tr.debit, a.interest_nominee_account_number_id  FROM transactions.transactions t 
+INNER JOIN transactions.transaction_details tr ON t.tran_id = tr.tran_id
+INNER JOIN deposit.account_holders a ON tr.account_number_id = a.account_number_id
+INNER JOIN core.date_conversion c ON t.tran_date = c.date_in_ad
+AND tr.debit>'0'
+AND t.book_name='FDTransfer' AND t.tran_date BETWEEN from_ AND to_ AND a.office_id = office_id_);
+ELSE
+RETURN QUERY(
+SELECT t.tran_id, a.office_id, c.date_in_bs, a.account_number, t.book_name, tr.debit, a.interest_nominee_account_number_id  FROM transactions.transactions  t 
+INNER JOIN transactions.transaction_details tr ON t.tran_id = tr.tran_id
+INNER JOIN deposit.account_holders a ON tr.account_number_id = a.account_number_id
+INNER JOIN core.date_conversion c ON t.tran_date = c.date_in_ad
+AND tr.debit>'0'
+AND t.book_name='FDTransfer' AND t.tran_date BETWEEN from_ AND to_ );
+END IF;
+
+END
+$BODY$;

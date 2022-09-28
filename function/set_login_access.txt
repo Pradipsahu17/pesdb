@@ -1,0 +1,54 @@
+-- SELECT * FROM policies.set_login_access(0)
+
+-- DROP FUNCTION IF EXISTS policies.set_login_access(integer);
+
+CREATE OR REPLACE FUNCTION policies.set_login_access(
+	office_id_ integer)
+	RETURNS TABLE(login_access_id integer,office_id bigint,office_name character varying(150),user_id bigint,user_name character varying(50),role_name character varying(50),hours_from time without time zone,hours_to time without time zone,access_from timestamp without time zone,access_to timestamp without time zone,holiday_access boolean,status boolean,audit_user_id integer,audit_ts timestamp with time zone)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	IF $1 = 0 THEN
+		RETURN QUERY(
+			SELECT l.login_access_id,
+				l.office_id,
+				u.office_name,
+				l.user_id,
+				u.user_name,
+				u.role_name,
+				l.hours_from,
+				l.hours_to,
+				l.access_from,
+				l.access_to,
+				l.holiday_access,
+				l.status,
+				l.audit_user_id,
+				l.audit_ts
+			FROM policies.login_access l
+			INNER JOIN office.users_view u ON l.user_id = u.user_id
+		);
+	ELSE
+		RETURN QUERY(
+			SELECT l.login_access_id,
+				l.office_id,
+				u.office_name,
+				l.user_id,
+				u.user_name,
+				u.role_name,
+				l.hours_from,
+				l.hours_to,
+				l.access_from,
+				l.access_to,
+				l.holiday_access,
+				l.status,
+				l.audit_user_id,
+				l.audit_ts
+			FROM policies.login_access l
+			INNER JOIN office.users_view u ON l.user_id = u.user_id
+			WHERE l.office_id = $1
+		);
+	END IF;
+END
+$BODY$;

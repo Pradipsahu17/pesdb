@@ -1,0 +1,18 @@
+-- select * from transactions.get_max_kitta_no()
+
+-- DROP FUNCTION IF EXISTS transactions.get_max_kitta_no();
+
+CREATE OR REPLACE FUNCTION transactions.get_max_kitta_no(
+	)
+    RETURNS integer
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _max integer;
+	BEGIN
+		_max := (SELECT COALESCE(MAX(kitta_no),0)+1 FROM transactions.share_transaction);
+		
+		RETURN _max;
+	END
+$BODY$;

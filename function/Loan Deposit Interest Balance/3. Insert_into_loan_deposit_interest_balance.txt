@@ -1,0 +1,98 @@
+-- FUNCTION: core.insert_into_loan_deposit_interest_balance(integer, date, date, numeric, numeric, numeric, money, boolean, character varying, money)
+
+-- DROP FUNCTION IF EXISTS core.insert_into_loan_deposit_interest_balance(integer, date, date, numeric, numeric, numeric, money, boolean, character varying, money);
+
+CREATE OR REPLACE FUNCTION core.insert_into_loan_deposit_interest_balance(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	depbonusrate_ numeric,
+	loanbonusrate_ numeric,
+	tax_ numeric,
+	minbonus_ money,
+	cal_for_badloan_ boolean,
+	deposit_product_ character varying,
+	share_bal_ money)
+    RETURNS TABLE(sn bigint, office_id integer, customer_id bigint, name character varying, address character varying, contact character varying, depaccs character varying, loan_accs character varying, dep_interest money, loan_interest money, loanbonus money, depbomus money, totalbonus money, tax money, net money, postacc character varying, share_ac character varying, share_balance money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	declare i int = 0;
+    BEGIN
+-- 		select * from core.insert_into_loan_deposit_interest_balance(2, '2021-07-16', '2021-9-01', 2,2,5,'1', true,'Normal Saving A/C','1000')
+
+        DELETE FROM core.loan_deposit_interest_balance;
+		
+		IF $1 = 0 THEN
+			INSERT INTO core.loan_deposit_interest_balance(sn,office_id,customer_id, name, address, contact, depaccs, loan_accs, dep_interest, loan_interest, loanbonus, totalbonus, tax, net, postacc, share_ac, share_balance) 
+			SELECT l.sn,
+			0,
+			l.customer_id, 
+			l.name, 
+			l.address, 
+			l.contact, 
+			l.depaccs, 
+			l.loan_accs, 
+			l.dep_interest, 
+			l.loan_interest, 
+			l.loanbonus, 
+			l.totalbonus, 
+			l.tax, 
+			l.net, 
+			l.postacc, 
+			l.share_ac, 
+			l.share_balance        
+			FROM transactions.get_loan_deposit_interest_balance($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) l;
+
+			LOOP
+				i := i + 1;
+				EXIT WHEN i > (SELECT COUNT(order_id) FROM core.posting_product_order)::integer;
+
+				UPDATE core.loan_deposit_interest_balance SET postacc=a.account_number, office_id = a.office_id
+				FROM deposit.account_holders a
+				where core.loan_deposit_interest_balance.customer_id= a.customer_id
+				and a.deposit_product_id=(SELECT deposit_product_id FROM core.posting_product_order WHERE order_id = i)
+				and a.status=true
+				and loan_deposit_interest_balance.postacc IS NULL;
+			END LOOP; 
+		ELSE
+			INSERT INTO core.loan_deposit_interest_balance(sn,office_id,customer_id, name, address, contact, depaccs, loan_accs, dep_interest, loan_interest, loanbonus, totalbonus, tax, net, postacc, share_ac, share_balance) 
+			SELECT l.sn,
+			$1,
+			l.customer_id, 
+			l.name, 
+			l.address, 
+			l.contact, 
+			l.depaccs, 
+			l.loan_accs, 
+			l.dep_interest, 
+			l.loan_interest, 
+			l.loanbonus, 
+			l.totalbonus, 
+			l.tax, 
+			l.net, 
+			l.postacc, 
+			l.share_ac, 
+			l.share_balance        
+			FROM transactions.get_loan_deposit_interest_balance($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) l;
+
+			LOOP
+				i := i + 1;
+				EXIT WHEN i > (SELECT COUNT(order_id) FROM core.posting_product_order)::integer;
+
+				UPDATE core.loan_deposit_interest_balance SET postacc=a.account_number
+				FROM deposit.account_holders a
+				where core.loan_deposit_interest_balance.customer_id= a.customer_id
+				and a.deposit_product_id=(SELECT deposit_product_id FROM core.posting_product_order WHERE order_id = i)
+				and a.status=true
+				and loan_deposit_interest_balance.postacc IS NULL;
+			END LOOP;
+		END IF;
+		
+        RETURN QUERY (SELECT * FROM core.loan_deposit_interest_balance ORDER BY customer_id);
+
+    END
+$BODY$;

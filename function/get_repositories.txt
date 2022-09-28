@@ -1,0 +1,31 @@
+CREATE OR REPLACE FUNCTION office.get_repositories(
+	user_id_ integer,
+	office_id_ integer)
+    RETURNS TABLE(repository_id integer, repository_name character varying) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE now_ time := (SELECT CURRENT_TIME);
+    DECLARE from_ time := (select hours_from from policies.repository_policy where user_id=$1);
+    DECLARE to_ time := (select hours_to from policies.repository_policy where user_id=$1);
+BEGIN
+	RETURN QUERY
+	(
+	SELECT 
+		r.repository_id, r.repository_name
+	FROM office.repository r
+	WHERE r.repository_id IN(
+		SELECT p.repository_id FROM policies.repository_policy p
+		WHERE p.user_id=$1
+		AND r.office_id=$2
+ 		AND now_ between from_ and to_
+		AND core.get_date() BETWEEN p.access_from::date AND p.access_to::date
+		AND UPPER(p.scope) = 'UNILATERAL OWNERSHIP'
+		AND p.status = true
+	)
+	);
+END
+$BODY$;

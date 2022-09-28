@@ -1,0 +1,56 @@
+-- SELECT * FROM deposit.get_transaction_report_details(2::int, '2021-10-05'::date, '2021-10-10'::date, ''::character varying(20), 0::bigint, 0::int, 0::int, 0::smallint, 0::smallint)
+
+-- DROP FUNCTION deposit.get_transaction_report_details(integer,date,date,character varying,bigint,integer,integer,smallint,smallint)
+
+CREATE OR REPLACE FUNCTION deposit.get_transaction_report_details(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	trans_type_ character varying,
+	product_id_ bigint,
+	collector_id_ integer,
+	user_id_ integer,
+	ibt_type_ smallint,
+	cash_type_ smallint)
+	RETURNS TABLE(sn bigint, tran_id bigint, account_number character varying, product_name character varying, member_name text, member_address text, contact_number text,tran_date character varying, value_date character varying, collector_name character varying, debit money,credit money, check_number text, statement_reference text,audit_user character varying, office_code character varying, is_cash_tran boolean, tran_office_code character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		CREATE TEMP TABLE _t(tran_id bigint,
+			account_number character varying,
+			product_name character varying,
+			member_name text,
+			member_address text,
+			contact_number text,
+			tran_date character varying,
+			value_date character varying,
+			collector_name character varying,
+			debit money,
+			credit money,
+			check_number text,
+			statement_reference text,
+			audit_user character varying,
+			office_code character varying,
+			is_cash_tran boolean,
+			tran_office_code character varying
+		) ON COMMIT DROP;
+		
+		INSERT INTO _t
+		SELECT t.tran_id, a.account_number, p.deposit_product_name, c.customer_name, c.permanent_address, c.contact_number, 
+			core.date_bs_from_ad(t.tran_date), core.date_bs_from_ad(t.value_date), co.collector_name, t.debit, t.credit, t.check_number,
+			t.statement_reference, u.user_name, transactions.get_office_code(t.ibt_tran_id), transactions.is_cash_tran(t.tran_id), 
+			office.get_office_code_by_id(transactions.get_transaction_office_id(t.tran_id))
+		FROM deposit.get_transaction_report($1, $2, $3, $4, $5, $6, $7, $8, $9)t
+		INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+		INNER JOIN office.collectors co ON t.collector_id = co.collector_id INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+		LEFT JOIN office.users u ON t.user_id = u.user_id;
+		
+		INSERT INTO _t(product_name,debit,credit)
+		SELECT  '        Total', SUM(COALESCE(_t.debit, '0')), SUM(COALESCE(_t.credit, '0')) FROM _t;
+		
+		RETURN QUERY(SELECT ROW_NUMBER() OVER(),* FROM _t);
+	END
+$BODY$;
+

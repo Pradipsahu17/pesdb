@@ -1,0 +1,35 @@
+-- SELECT * FROM sms.get_account_detail('HL-0000003')	
+
+CREATE OR REPLACE FUNCTION sms.get_account_detail(
+	account_number_ character varying)
+	RETURNS TABLE(id integer, member_id bigint, start_date timestamp without time zone, status boolean, corporate_member boolean, weekly_sms_sent_date timestamp without time zone, office_id integer, fee_charges boolean, account_number text, account_type character varying, sms_type character varying, payment_count integer, mobile_number text)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _count integer:= (SELECT COALESCE(COUNT(*),0) FROM sms.customer_sms s WHERE s.account_number = $1);
+BEGIN
+	IF _count < 1 THEN
+		RAISE EXCEPTION 'Not valid account number!!';
+	ELSE					  
+		RETURN QUERY(
+			SELECT s.id,
+				s.customer_id,
+				s.start_date,
+				s.status,
+				s.corporate_customer,
+				s.weekly_sms_sent_date,
+				s.office_id,
+				s.fee_charges,
+				s.account_number,
+				s.account_type,
+				s.sms_type,
+				s.payment_count,
+				c.contact_number 
+			FROM sms.customer_sms s
+			INNER JOIN sms.customers_view c ON s.customer_id = c.customer_id
+			WHERE s.account_number = $1
+		);
+	END IF;
+END
+$BODY$

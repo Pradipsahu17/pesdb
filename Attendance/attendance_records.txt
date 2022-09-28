@@ -1,0 +1,40 @@
+-- DROP TABLE office.attendance_records
+
+CREATE TABLE IF NOT EXISTS office.attendance_records(
+	attendance_record_id bigserial PRIMARY KEY UNIQUE NOT NULL,
+	attendance_date date NOT NULL,
+	employee_id bigint REFERENCES office.employee_info(employee_id) NOT NULL,
+	is_present boolean,
+	is_holiday boolean,
+	is_leave boolean,
+	check_in_time time without time zone,
+	check_out_time time without time zone,
+	notes character varying,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp without time zone DEFAULT now()
+);
+
+
+-- SELECT * FROM office.active_employee_view
+
+CREATE OR REPLACE VIEW office.active_employee_view
+ AS
+  SELECT ROW_NUMBER() OVER() sn,
+  	employee_id,
+  	employee_name
+  FROM office.employee_info
+  WHERE status = true;
+  	
+
+-- DROP TYPE IF EXISTS office.record_detail_type;
+
+CREATE TYPE office.record_detail_type AS
+(
+	employee_id integer,
+	is_present boolean,
+	is_holiday boolean,
+	is_leave boolean,
+	check_in_time time without time zone,
+	check_out_time time without time zone,
+	notes character varying
+);

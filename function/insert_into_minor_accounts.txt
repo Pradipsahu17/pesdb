@@ -1,0 +1,32 @@
+-- select * from core.insert_into_minor_accounts(69,1,'TEST','','TEST',1,1,'2010-12-06 00:00:00 ','2068/09/21','KATHMANDU','12542','KATHMANDU','2011-06-06',1)
+
+CREATE OR REPLACE FUNCTION core.insert_into_minor_accounts(
+	guardian_id_ bigint,
+	relation_id_ integer,
+	first_name_ character varying,
+	middle_name_ character varying,
+	last_name_ character varying,
+	cast_id_ integer,
+	gender_id_ integer,
+	date_of_birth_ timestamp without time zone,
+	date_of_birth_bs_ character varying,
+	birth_place_ character varying,
+	birth_certificate_number_ character varying,
+	birth_certificate_issue_place_ character varying,
+	issued_date_ character varying,
+	audit_user_id_ integer)
+	RETURNS BIGINT
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _minor_account_id bigint;
+	BEGIN
+		INSERT INTO CORE.MINOR_ACCOUNTS(guardian_id,relation_id,first_name,middle_name,last_name,cast_id,gender_id,date_of_birth,date_of_birth_bs,birth_place,birth_certificate_number,birth_certificate_issue_place,issued_date,audit_user_id)
+		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14;
+		 
+		SELECT CURRVAL('core.minor_accounts_minor_account_id_seq') INTO _minor_account_id;
+		
+		RETURN _minor_account_id;
+	END
+$BODY$;

@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS office.meeting_allowance(
+	meeting_allowance_id bigserial UNIQUE PRIMARY KEY NOT NULL,
+	office_id bigint REFERENCES office.offices(office_id) NOT NULL, 
+	year_id integer NOT NULL,
+	month_id integer NOT NULL,
+	allowance money NOT NULL,
+	tran_id bigint REFERENCES transactions.transactions(tran_id) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS office_id_ix
+ ON office.meeting_allowance USING btree
+ (office_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS tran_id_ix
+ ON office.meeting_allowance USING btree
+ (tran_id ASC NULLS LAST);

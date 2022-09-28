@@ -1,0 +1,35 @@
+-- FUNCTION: core.get_purchased_share_kitta(bigint)
+
+-- DROP FUNCTION IF EXISTS core.get_purchased_share_kitta(bigint);
+
+CREATE OR REPLACE FUNCTION core.get_purchased_share_kitta(
+	share_account_id_ bigint)
+    RETURNS TABLE(share_no integer) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+	DECLARE _starts int;
+	DECLARE _ends   int;
+	DECLARE r record;
+BEGIN 
+ 	CREATE TEMP TABLE _t(num int)ON COMMIT DROP;
+	FOR r IN SELECT * FROM transactions.get_share_kitta_details(share_account_id_) WHERE tran_type = 'Cr'
+	LOOP
+		SELECT starts, ends INTO _starts, _ends FROM transactions.get_share_kitta_details(share_account_id_) WHERE tran_id = r.tran_id;
+
+		 FOR i IN _starts .. _ends LOOP
+		    INSERT INTO _t(num)
+		    SELECT i;
+		 END LOOP;
+
+	END LOOP;
+RETURN QUERY(select * from _t);
+END
+$BODY$;
+
+ALTER FUNCTION core.get_purchased_share_kitta(bigint)
+    OWNER TO postgres;

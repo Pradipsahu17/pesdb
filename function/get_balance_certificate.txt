@@ -1,0 +1,37 @@
+-- select * from deposit.get_balance_certificate('02-01-00000001')
+
+-- drop function if exists deposit.get_balance_certificate(character varying)
+
+CREATE OR REPLACE FUNCTION deposit.get_balance_certificate(
+	account_number_ character varying)
+	RETURNS TABLE(office_name character varying,office_address character varying,member_name text, contact_number text, member_address text, account_number character varying, account_type character varying, balance money, balance_till character varying, account_open_date character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	DECLARE _date date := (SELECT core.get_date());
+BEGIN
+	RETURN QUERY(
+		SELECT o.office_name,
+			o.street,
+			c.customer_name,
+			c.permanent_address,
+			c.contact_number,
+			a.account_number,
+			p.deposit_product_name,
+			deposit.get_balance(a.account_number_id, '2021-10-24'),
+			core.date_bs_from_ad('2021-10-24'),
+			core.date_bs_from_ad(a.account_open_date::date)
+		FROM deposit.account_holders a
+		INNER JOIN core.customers_view c
+			ON a.customer_id = c.customer_id
+		INNER JOIN core.deposit_products p
+			ON a.deposit_product_id = p.deposit_product_id
+		INNER JOIN office.offices o
+			ON a.office_id = o.office_id
+		WHERE a.account_number = $1
+	);
+END
+$BODY$;
+
+select * from office.offices 

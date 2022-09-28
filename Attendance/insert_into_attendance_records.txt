@@ -1,0 +1,30 @@
+-- DROP FUNCTION IF EXISTS office.insert_into_attendance_records(date, integer, json);
+
+CREATE OR REPLACE FUNCTION office.insert_into_attendance_records(
+	attendance_date_ date,
+	user_id_ integer,
+	record_details_ json)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE i integer := 1;
+	BEGIN
+		CREATE TEMP TABLE _t(sn serial, employee_id integer, is_present boolean, is_holiday boolean, is_leave boolean, check_in_time time without time zone, notes character varying) ON COMMIT DROP;
+		INSERT INTO _t(employee_id, is_present, is_holiday, is_leave, check_in_time, notes)
+		SELECT r.employee_id, r.is_present, r.is_holiday, r.is_leave, r.check_in_time, r.notes
+		FROM json_populate_recordset(null::office.record_detail_type, $3) r;
+		
+		LOOP
+			INSERT INTO office.attendance_records(attendance_date,employee_id, is_present, is_holiday, is_leave, check_in_time, notes, audit_user_id) 
+			SELECT $1,_t.emplopyee_id, _t.is_present, _t.is_holiday, _t.is_leave, _t.check_in_time, _t.notes, $2
+			FROM _t WHERE _t.sn = i;
+			
+			i = i + 1;
+			EXIT WHEN i > (SELECT COUNT(*) FROM _t);
+		END LOOP;
+		
+		RETURN true;
+	END
+$BODY$;

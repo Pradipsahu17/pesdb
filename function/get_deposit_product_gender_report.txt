@@ -1,0 +1,54 @@
+CREATE OR REPLACE FUNCTION deposit.get_deposit_product_gender_report(
+	)
+	RETURNS TABLE(deposit_product_id integer, deposit_product_name character varying, Male bigint, Female bigint, Not_Applicable bigint)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT ac.deposit_product_id,
+				p.deposit_product_name,
+				m.male,
+				f.female,
+				n.not_applicable
+			FROM deposit.account_holders ac 
+			INNER JOIN core.deposit_products p
+				ON ac.deposit_product_id = p.deposit_product_id
+			LEFT JOIN
+				(
+					SELECT count(c.gender_name) as male,
+						a.deposit_product_id as product_id
+					FROM core.customers_view c 
+					INNER JOIN deposit.account_holders a 
+						ON c.customer_id = a.customer_id 
+					WHERE c.gender_name='Male' 
+					AND a.deposit_product_id in (select ah.deposit_product_id from deposit.account_holders ah) group by a.deposit_product_id
+				) m ON ac.deposit_product_id = m.product_id 
+
+			LEFT JOIN
+				(
+					SELECT count(c.gender_name) as female,
+						a.deposit_product_id as product_id
+					FROM core.customers_view c 
+					INNER JOIN deposit.account_holders a 
+						ON c.customer_id = a.customer_id 
+					WHERE c.gender_name='Female' 
+					AND a.deposit_product_id in (select ah.deposit_product_id from deposit.account_holders ah) group by a.deposit_product_id
+				) f ON ac.deposit_product_id = f.product_id 
+
+			LEFT JOIN
+				(
+					SELECT count(c.gender_name) as not_applicable,
+						a.deposit_product_id as product_id
+					FROM core.customers_view c 
+					INNER JOIN deposit.account_holders a 
+						ON c.customer_id = a.customer_id 
+					WHERE c.gender_name='Not Applicable' 
+					AND a.deposit_product_id in (select ah.deposit_product_id from deposit.account_holders ah) group by a.deposit_product_id
+				) n ON ac.deposit_product_id = n.product_id 
+
+			GROUP BY ac.deposit_product_id, p.deposit_product_name, m.male, f.female, n.not_applicable
+		);
+	END
+$BODY$;

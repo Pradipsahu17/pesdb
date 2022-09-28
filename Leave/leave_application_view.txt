@@ -1,0 +1,30 @@
+-- DROP VIEW office.leave_application_view;
+
+CREATE OR REPLACE VIEW office.leave_application_view
+ AS
+ SELECT l.leave_application_id,
+    l.application_date,
+    l.employee_id,
+    e.employee_name,
+    e.address,
+    e.contact,
+    l.demanded_days,
+    l.approved_days,
+    l.notes,
+    l.verification_status_id,
+	v.verification_status_name,
+    l.verified_by verified_by_id,
+	us.user_name verified_by,
+    l.verified_date,
+    core.date_bs_from_ad(l.verified_date) verified_date_BS,
+    l.audit_user_id,
+    u.user_name,
+    l.leave_type_id,
+    t.type_name
+   FROM office.leave_application l
+     JOIN office.employee_info_view e ON l.employee_id = e.employee_id
+     JOIN office.users u ON l.audit_user_id = u.user_id
+	 JOIN core.verification_statuses v ON l.verification_status_id = v.verification_status_id
+	 LEFT JOIN office.users us ON l.verified_by = us.user_id
+     JOIN office.leave_type t ON l.leave_type_id = t.leave_type_id;
+	 

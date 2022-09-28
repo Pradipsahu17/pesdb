@@ -1,0 +1,44 @@
+-- select * from deposit.get_eteller_report_details(2,3318635)
+
+CREATE OR REPLACE FUNCTION deposit.get_eteller_report_details(
+	office_id_ integer,
+	tran_id_ bigint)
+	RETURNS TABLE(sn bigint, office_name character varying,nick_name character varying,registration_date date,street character varying,city character varying,state character varying,country character varying,phone character varying,fax character varying,email character varying,url character varying,registration_number character varying,pan_number character varying, tran_id bigint, tran_date character varying, member_name text, member_address text, contact_number text, account_number character varying, debit money, credit money, statement_reference character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	RETURN QUERY(
+		SELECT ROW_NUMBER() OVER(),
+			o.office_name,
+			o.nick_name,
+			o.registration_date,
+			o.street,
+			o.city,
+			o.state,
+			o.country,
+			o.phone,
+			o.fax,
+			o.email,
+			o.url,
+			o.registration_number,
+			o.pan_number,
+			e.tran_id,
+			e.tran_date,
+			c.customer_name,
+			c.permanent_address,
+			c.contact_number,
+			e.account_number,
+			e.debit,
+			e.credit,
+			e.statement_reference
+		FROM deposit.get_eteller_report($1) e
+		INNER JOIN transactions.transaction_details td ON td.tran_id = e.tran_id
+		INNER JOIN deposit.account_holders a ON td.account_number_id = a.account_number_id
+		INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+		INNER JOIN office.offices o ON a.office_id = o.office_id
+		WHERE e.tran_id = $2
+	);
+END
+$BODY$;

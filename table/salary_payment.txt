@@ -1,0 +1,45 @@
+CREATE TABLE IF NOT EXISTS office.salary_payment(
+	payment_id bigserial UNIQUE PRIMARY KEY NOT NULL,
+	office_id bigint REFERENCES office.offices(office_id) NOT NULL, 
+	year_id integer NOT NULL,
+	month_id integer NOT NULL,
+	employee_id bigint REFERENCES office.employee_info(employee_id) NOT NULL,
+	salary money NOT NULL,
+	allowance money NOT NULL,
+	tran_id bigint REFERENCES transactions.transactions(tran_id) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS office_id_ix
+ ON office.salary_payment USING btree
+ (office_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS employee_id_ix
+ ON office.salary_payment USING btree
+ (employee_id ASC NULLS LAST);
+ 
+CREATE INDEX IF NOT EXISTS tran_id_ix
+ ON office.salary_payment USING btree
+ (tran_id ASC NULLS LAST);
+
+
+CREATE OR REPLACE VIEW office.salary_payment_view
+ AS
+	SELECT s.payment_id,
+		s.office_id,
+		o.office_name,
+		s.year_id,
+		m.month_name_english,
+		s.employee_id,
+		e.employee_name,
+		e.contact,
+		e.address,
+		s.salary,
+		s.allowance,
+		s.tran_id
+	FROM office.salary_payment s
+	INNER JOIN office.offices o 
+		ON o.office_id = s.office_id
+	INNER JOIN office.employee_info e
+		ON s.employee_id = e.employee_id
+	INNER JOIN core.months m
+		ON s.month_id = m.month_id;

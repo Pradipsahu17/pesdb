@@ -1,0 +1,120 @@
+-- SELECT * FROM deposit.get_deposit_receipt_report(2,'ALL','2020-10-10','2020-12-10')
+
+CREATE OR REPLACE FUNCTION deposit.get_deposit_receipt_report(
+	office_id_ integer,
+	book_name_ character varying,
+	from_ date,
+	to_ date)
+	RETURNS TABLE(sn bigint,office_name character varying, tran_id bigint, tran_date character varying, member_name text, member_address text, book_name character varying, collector_name character varying, account_number character varying, statement_reference character varying, debit money, credit money, audit_user character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	IF $1 = 0 THEN
+		IF $2 = 'ALL' THEN
+			RETURN QUERY(
+				SELECT ROW_NUMBER() OVER(),
+					o.nick_name,
+					t.tran_id,
+					core.date_bs_from_ad(t.tran_date::date),
+					c.customer_name,
+					c.permanent_address,
+					t.book_name,
+					co.collector_name,
+					a.account_number,
+					t.statement_reference,
+					t.debit,
+					t.credit,
+					u.user_name
+				FROM deposit.transaction_view t
+				INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id
+				INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+				INNER JOIN office.collectors co ON t.collector_id = co.collector_id
+				INNER JOIN office.offices o ON o.office_id = t.office_id
+				INNER JOIN office.users u ON t.user_id = u.user_id
+				WHERE t.book_name IN ('Deposit','Withdrawal')
+				AND t.tran_date BETWEEN $3 AND $4
+			);
+		ELSE
+			RETURN QUERY(
+				SELECT ROW_NUMBER() OVER(),
+					o.nick_name,
+					t.tran_id,
+					core.date_bs_from_ad(t.tran_date::date),
+					c.customer_name,
+					c.permanent_address,
+					t.book_name,
+					co.collector_name,
+					a.account_number,
+					t.statement_reference,
+					t.debit,
+					t.credit,
+					u.user_name
+				FROM deposit.transaction_view t
+				INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id
+				INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+				INNER JOIN office.collectors co ON t.collector_id = co.collector_id
+				INNER JOIN office.offices o ON o.office_id = t.office_id
+				INNER JOIN office.users u ON t.user_id = u.user_id
+				WHERE t.book_name = $2
+				AND t.tran_date BETWEEN $3 AND $4
+			);
+		END IF;	
+	ELSE
+		IF $2 = 'ALL' THEN
+			RETURN QUERY(
+				SELECT ROW_NUMBER() OVER(),
+					o.nick_name,
+					t.tran_id,
+					core.date_bs_from_ad(t.tran_date::date),
+					c.customer_name,
+					c.permanent_address,
+					t.book_name,
+					co.collector_name,
+					a.account_number,
+					t.statement_reference,
+					t.debit,
+					t.credit,
+					u.user_name
+				FROM deposit.transaction_view t
+				INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id
+				INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+				INNER JOIN office.collectors co ON t.collector_id = co.collector_id
+				INNER JOIN office.offices o ON o.office_id = t.office_id
+				INNER JOIN office.users u ON t.user_id = u.user_id
+				WHERE t.office_id = $1
+				AND t.book_name IN ('Deposit','Withdraw')
+				AND t.tran_date BETWEEN $3 AND $4
+			);
+		ELSE
+			RETURN QUERY(
+				SELECT ROW_NUMBER() OVER(),
+					o.nick_name,
+					t.tran_id,
+					core.date_bs_from_ad(t.tran_date::date),
+					c.customer_name,
+					c.permanent_address,
+					t.book_name,
+					co.collector_name,
+					a.account_number,
+					t.statement_reference,
+					t.debit,
+					t.credit,
+					u.user_name
+				FROM deposit.transaction_view t
+				INNER JOIN deposit.account_holders a ON t.account_number_id = a.account_number_id
+				INNER JOIN core.customers_view c ON a.customer_id = c.customer_id
+				INNER JOIN office.collectors co ON t.collector_id = co.collector_id
+				INNER JOIN office.offices o ON o.office_id = t.office_id
+				INNER JOIN office.users u ON t.user_id = u.user_id
+				WHERE t.office_id = $1
+				AND t.book_name = $2
+				AND t.tran_date BETWEEN $3 AND $4
+			);
+		END IF;
+	END IF;
+END
+$BODY$;
+	
+	

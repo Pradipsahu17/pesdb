@@ -1,0 +1,18 @@
+-- select * from core.get_validate_citizenship_number('39696081')
+
+CREATE OR REPLACE FUNCTION core.get_validate_citizenship_number(
+	citizenship_number_ character varying)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		IF $1 NOT IN (SELECT citizenship_number FROM core.non_corporate_customers)
+		THEN
+			RETURN true;
+		ELSE
+			RETURN false;
+		END IF;
+	END
+$BODY$;

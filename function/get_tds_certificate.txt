@@ -1,0 +1,60 @@
+-- select * from deposit.get_tds_certificate('02-27-00000030','2010-10-10','2021-10-10')
+
+-- DROP FUNCTION IF EXISTS deposit.get_tds_certificate(character varying, date, date);
+
+CREATE OR REPLACE FUNCTION deposit.get_tds_certificate(
+	account_number_ character varying,
+	from_ date,
+	to_ date)
+    RETURNS TABLE(sn bigint, date character varying, member_name text, member_address text, account_number character varying, interest numeric, tax numeric, interest_after_tax numeric,officer_name character varying, officer_post character varying) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE _t(
+		sn bigint, 
+		date_ character varying,
+		member_name text, 
+		member_address text, 
+		account_number character varying, 
+		interest numeric, 
+		tax numeric,
+		interest_after_tax numeric,
+		officer_name character varying,
+		officer_post character varying
+	)ON COMMIT DROP;
+	
+	INSERT INTO _t
+	SELECT ROW_NUMBER() OVER(),
+		core.date_bs_from_ad(i.value_date),
+		c.customer_name,
+		c.permanent_address,
+		a.account_number,
+		i.interest,
+		i.tax,
+		i.interest - i.tax,
+		'test_name','test_post'
+	FROM deposit.interest_transfer i
+	INNER JOIN deposit.account_holders a
+		ON i.account_number_id = a.account_number_id
+	INNER JOIN core.customers_view c
+		On a.customer_id = c.customer_id
+	WHERE a.account_number = $1
+	AND i.value_date BETWEEN $2 AND $3;
+	
+	INSERT INTO _t(account_number, interest, tax,interest_after_tax)
+	SELECT 'Total',
+		SUM(_t.interest),
+		SUM(_t.tax),
+		SUM(_t.interest_after_tax)
+	FROM _t;
+		
+	RETURN QUERY(SELECT * FROM _t);
+END
+$BODY$;
+
+ALTER FUNCTION deposit.get_tds_certificate(character varying, date, date)
+    OWNER TO postgres;

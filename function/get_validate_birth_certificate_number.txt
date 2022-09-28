@@ -1,0 +1,18 @@
+-- select * from core.get_validate_birth_certificate_number('12451')
+
+CREATE OR REPLACE FUNCTION core.get_validate_birth_certificate_number(
+	birth_certificate_number_ character varying)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		IF $1 NOT IN (SELECT birth_certificate_number FROM core.minor_accounts)
+		THEN
+			RETURN true;
+		ELSE
+			RETURN false;
+		END IF;
+	END
+$BODY$;

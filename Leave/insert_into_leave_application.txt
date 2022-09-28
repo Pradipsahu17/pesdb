@@ -1,0 +1,24 @@
+-- DROP FUNCTION IF EXISTS office.insert_into_leave_application(date, bigint, integer, character varying, integer, integer);
+
+CREATE OR REPLACE FUNCTION office.insert_into_leave_application(
+	application_date_ date,
+	employee_id_ bigint,
+	demanded_days_ integer,
+	notes_ character varying,
+	user_id_ integer,
+	leave_type_id integer)
+    RETURNS bigint
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE leave_application_id_ bigint;
+BEGIN
+	INSERT INTO office.leave_application(application_date, employee_id, demanded_days, notes, audit_user_id,leave_type_id)
+	SELECT $1,$2,$3,$4,$5,$6;
+	
+	SELECT CURRVAL('office.leave_application_leave_application_id_seq') INTO leave_application_id_;
+			
+	RETURN leave_application_id_;
+END
+$BODY$;

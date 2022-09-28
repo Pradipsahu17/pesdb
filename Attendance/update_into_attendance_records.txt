@@ -1,0 +1,29 @@
+-- select * from office.update_into_attendance_records('[{"employee_id":1,"check_out_time":"17:00"}]')
+
+-- DROP FUNCTION IF EXISTS office.insert_into_attendance_records(date, integer, json);
+
+CREATE OR REPLACE FUNCTION office.update_into_attendance_records(
+	record_details_ json)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE i integer := 1;
+	BEGIN
+		CREATE TEMP TABLE _t(sn serial, employee_id integer, check_out_time time without time zone) ON COMMIT DROP;
+		INSERT INTO _t(employee_id, check_out_time)
+		SELECT r.employee_id, r.check_out_time
+		FROM json_populate_recordset(null::office.record_detail_type, $1) r;
+		
+		LOOP
+			UPDATE office.attendance_records a SET check_out_time =  _t.check_out_time
+			FROM _t WHERE _t.sn = i AND _t.employee_id = a.employee_id;
+			
+			i = i + 1;
+			EXIT WHEN i > (SELECT COUNT(*) FROM _t);
+		END LOOP;
+		
+		RETURN true;
+	END
+$BODY$;

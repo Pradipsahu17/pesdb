@@ -1,0 +1,18 @@
+CREATE OR REPLACE FUNCTION office.reject_leave_application(
+	leave_application_id_ bigint,
+	verified_by_ integer,
+	verification_note character varying)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _date date := (SELECT core.get_date());
+BEGIN
+	UPDATE office.leave_application	
+	SET approved_days = null, verification_status_id = -3, verified_date = _date, verified_by = $2, verfication_note = $3
+	WHERE leave_application_id_ = $1;
+	
+	RETURN true;
+END
+$BODY$;

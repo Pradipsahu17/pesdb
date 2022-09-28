@@ -1,0 +1,64 @@
+-- FUNCTION: atm.balance_inquiry_on_us(character varying, character varying, character varying)
+
+-- DROP FUNCTION atm.balance_inquiry_on_us(character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION atm.balance_inquiry_on_us(
+	account_number_ character varying,
+	tran_type_ character varying,
+	bin_id_ character varying)
+    RETURNS TABLE(account_number character varying, balance money, ledger_balance money, interest_rate numeric, status text) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+/****** Object: atm.balance_inquiry_on_us(character varying) Author: Jeevan Gharti     Script Date: 11/29/2020 ******/
+
+	DECLARE _min_bal money;
+	DECLARE _bal	 money;
+	
+	DECLARE _from_office_id	integer;
+	DECLARE _to_office_id 	integer;
+	DECLARE _tran_id	bigint;
+	DECLARE _rem_tran_id	bigint;
+    DECLARE _ibt_tran_id 	bigint;
+	DECLARE _sys_id		integer;
+	DECLARE _date		date;
+	DECLARE _balance	money;
+	DECLARE _from_ac_id	bigint;
+	DECLARE _to_ac_id	bigint;--receiver
+    DECLARE _local_ibt_pay_gl	bigint;--payable to receiver office from other 
+	DECLARE _rem_rec_gl	bigint;--receivable from sender office by receiver office
+	DECLARE _pending_amt money;
+	DECLARE _atm_gl_id bigint;
+	DECLARE _expenses_gl_id_atm_charge bigint;
+	DECLARE _corporate_office_id int;
+	DECLARE _atm_charge money;
+	DECLARE _vostro_ac_id bigint;
+	DECLARE _ownership_charge_ac_id bigint;
+	DECLARE _atm_charge_ac_id bigint;
+	DECLARE _atm_annual_charge_ac_id bigint;
+	DECLARE _off_us_atm_charge money;
+	
+
+BEGIN
+	SELECT * FROM deposit.get_balance(account_number_) INTO _bal;
+	SELECT p.minimum_balance INTO _min_bal from core.deposit_products p
+	INNER JOIN deposit.account_holders a ON a.deposit_product_id=p.deposit_product_id
+	WHERE a.account_number= account_number_;
+
+	--select * from atm.balance_inquiry_on_us('01-11-00001248', 'off_us')
+	
+RETURN QUERY(
+  	SELECT a.account_number,
+		_bal-_min_bal,
+		_bal,									
+		a.interest_rate::numeric,  
+		CASE WHEN a.status=true THEN 'Active' ELSE 'Inactive' END AS status
+    FROM deposit.account_holders a 
+    WHERE a.account_number = $1
+);
+END
+$BODY$;
+

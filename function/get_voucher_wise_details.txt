@@ -1,0 +1,124 @@
+
+-- DROP FUNCTION transactions.get_voucher_wise_details(integer,integer,date,date,character varying)
+
+-- SELECT * FROM transactions.get_voucher_wise_details(0, 0, '2021-09-24', '2021-10-24','Deposit') 
+
+CREATE OR REPLACE FUNCTION transactions.get_voucher_wise_details(
+	office_id_ integer,
+	user_id integer,
+	from_ date,
+	to_ date,
+	book_name_ character varying)
+	RETURNS TABLE(tran_id bigint, tran_date date, deposit_account character varying(50), loan_account character varying(50), share_account character varying(50), ledger character varying(100), debit money, credit money, statement_reference character varying(500))
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	CREATE TEMP TABLE _t(
+		tran_id bigint,
+		tran_date date,
+		deposit_account character varying(50),
+		loan_account character varying(50),
+		share_account character varying(50),
+		ledger character varying(100),
+		debit money,
+		credit money,
+		statement_reference character varying(500)
+	) ON COMMIT DROP;
+
+	IF $1 = 0 THEN
+		IF $2 = 0 THEN
+			INSERT INTO _t
+			SELECT t.tran_id,
+				t.tran_date,
+				a.account_number,
+				l.loan_account_number,
+				s.account_number,
+				g.account_name,
+				d.debit,
+				d.credit,
+				d.statement_reference
+			FROM transactions.transactions t
+			INNER JOIN transactions.transaction_details d ON t.tran_id = d.tran_id
+			LEFT JOIN deposit.account_holders a ON d.account_number_id = a.account_number_id
+			LEFT JOIN loan.loan_grant l ON d.loan_id = l.loan_id
+			LEFT JOIN core.share_accounts s ON s.share_account_id = d.share_account_id
+			INNER JOIN core.gl_accounts g ON d.gl_account_id = g.gl_account_id
+			WHERE t.tran_date BETWEEN $3 AND $4
+			AND t.book_name = $5;
+		ELSE
+			INSERT INTO _t
+			SELECT t.tran_id,
+				t.tran_date,
+				a.account_number,
+				l.loan_account_number,
+				s.account_number,
+				g.account_name,
+				d.debit,
+				d.credit,
+				d.statement_reference
+			FROM transactions.transactions t
+			INNER JOIN transactions.transaction_details d ON t.tran_id = d.tran_id
+			LEFT JOIN deposit.account_holders a ON d.account_number_id = a.account_number_id
+			LEFT JOIN loan.loan_grant l ON d.loan_id = l.loan_id
+			LEFT JOIN core.share_accounts s ON s.share_account_id = d.share_account_id
+			INNER JOIN core.gl_accounts g ON d.gl_account_id = g.gl_account_id
+			WHERE t.tran_date BETWEEN $3 AND $4
+			AND t.audit_user_id = $2
+			AND t.book_name = $5;
+		END IF;
+	ELSE
+		IF $2 = 0 THEN
+			INSERT INTO _t
+			SELECT t.tran_id,
+				t.tran_date,
+				a.account_number,
+				l.loan_account_number,
+				s.account_number,
+				g.account_name,
+				d.debit,
+				d.credit,
+				d.statement_reference
+			FROM transactions.transactions t
+			INNER JOIN transactions.transaction_details d ON t.tran_id = d.tran_id
+			LEFT JOIN deposit.account_holders a ON d.account_number_id = a.account_number_id
+			LEFT JOIN loan.loan_grant l ON d.loan_id = l.loan_id
+			LEFT JOIN core.share_accounts s ON s.share_account_id = d.share_account_id
+			INNER JOIN core.gl_accounts g ON d.gl_account_id = g.gl_account_id
+			WHERE t.tran_date BETWEEN $3 AND $4
+			AND t.office_id = $1
+			AND t.book_name = $5;
+		ELSE
+			INSERT INTO _t
+			SELECT t.tran_id,
+				t.tran_date,
+				a.account_number,
+				l.loan_account_number,
+				s.account_number,
+				g.account_name,
+				d.debit,
+				d.credit,
+				d.statement_reference
+			FROM transactions.transactions t
+			INNER JOIN transactions.transaction_details d ON t.tran_id = d.tran_id
+			LEFT JOIN deposit.account_holders a ON d.account_number_id = a.account_number_id
+			LEFT JOIN loan.loan_grant l ON d.loan_id = l.loan_id
+			LEFT JOIN core.share_accounts s ON s.share_account_id = d.share_account_id
+			INNER JOIN core.gl_accounts g ON d.gl_account_id = g.gl_account_id
+			WHERE t.tran_date BETWEEN $3 AND $4
+			AND t.office_id = $1
+			AND t.audit_user_id = $2
+			AND t.book_name = $5;
+		END IF;
+	END IF;
+	
+	INSERT INTO _t(share_account, debit, credit)
+	SELECT 'Total',
+		sum(_t.debit),
+		sum(_t.credit)
+	FROM _t;
+	
+	RETURN QUERY (SELECT * FROM _t order by _t.tran_id);
+END
+$BODY$;

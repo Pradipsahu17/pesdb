@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS transactions.rejected_transactions(
+	reject_order_id bigserial PRIMARY KEY UNIQUE NOT NULL,
+	tran_id bigint REFERENCES transactions.transactions(tran_id) NOT NULL,
+	requested_by character varying NOT NULL,
+	statement_reference character varying,
+	modified_by character varying NOT NULL,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp without time zone DEFAULT now()
+);

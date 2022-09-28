@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS policies.login_access
+(
+	login_access_id serial PRIMARY KEY NOT NULL,
+	office_id bigint REFERENCES office.offices(office_id) NOT NULL,
+	user_id bigint REFERENCES office.users(user_id) NOT NULL,
+	hours_from time without time zone NOT NULL,
+	hours_to time without time zone NOT NULL,
+	access_from date NOT NULL,
+	access_to date NOT NULL,
+	holiday_access boolean NOT NULL,
+	status boolean NOT NULL DEFAULT false,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS policies_login_access_user_id_ix
+ON policies.login_access USING btree
+(user_id ASC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS policies_login_access_audit_user_id_ix
+ON policies.login_access USING btree
+(audit_user_id ASC NULLS LAST);

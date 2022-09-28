@@ -1,0 +1,315 @@
+--	SELECT * FROM transactions.get_dms_report(1, 0, '2020-01-14', '2020-07-15')
+
+--	DROP FUNCTION IF EXISTS transactions.get_dms_report(integer, integer, date, date);
+
+CREATE OR REPLACE FUNCTION transactions.get_dms_report(
+	office_id_ integer,
+	user_id_ integer,
+	from_ date,
+	to_ date)
+    RETURNS TABLE(sn character varying, title text, details character varying, debit money, credit money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE _gl_id		bigint;
+	DECLARE _fy_start	date;
+	DECLARE _parent_reserve_gl_id bigint;
+	DECLARE _parent_loan_payble_gl_id bigint;
+	DECLARE _payable_gl_id bigint;
+	DECLARE _donation_gl_id bigint;
+	DECLARE _income_gl_id bigint;
+	DECLARE _expenses_gl_group_id bigint;
+	DECLARE _cash_gl_id bigint;
+	DECLARE _bank_gl_id bigint;
+	DECLARE _assets_gl_id bigint;
+	DECLARE _receivable_gl_id bigint;
+	DECLARE _expenses_gl_id bigint;
+	DECLARE _other_reserve_gl_id bigint;
+BEGIN
+
+SELECT gl_account_id INTO _parent_reserve_gl_id FROM core.gl_accounts WHERE account_name='Reserves & Surplus';
+DROP TABLE IF EXISTS _b;
+CREATE TEMP TABLE _b(institution_type character varying,  dr_tran money, cr_tran money) ON COMMIT DROP;
+	
+	
+	
+--If office_id_> 0 THEN
+
+DROP TABLE IF EXISTS _t;
+	CREATE TEMP TABLE _t(id serial , sn character varying, title text, debit money, credit money, tl int, dtl text ) ON COMMIT DROP;
+	
+	SELECT gl_account_id INTO _gl_id FROM core.char_khata WHERE code=10;
+	INSERT INTO _t(sn, title, debit, credit) SELECT '१', 'शेयर हिसाब','0','0' ;
+
+	UPDATE _t SET debit=s.dr, credit=s.cr
+	FROM (SELECT SUM(COALESCE(v.debit,'0')) dr,SUM(COALESCE(v.credit,'0'))cr FROM core.share_transaction_view v WHERE tran_date BETWEEN from_ AND to_)s
+	WHERE _t.sn='१';
+	
+
+	INSERT INTO _t(sn, title, debit, credit) SELECT '१.१', '   ब्यक्तिग (नाम खुलेकाे) ','0','0';
+	
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT _t.debit dr, _t.credit cr FROM _t WHERE _t.sn='१') t
+	WHERE _t.sn='१.१';
+	
+	
+	
+	
+	INSERT INTO _t(sn, title, debit, credit) SELECT '२', 'जगेडा कोस','0', '0';
+	--row_number() over (order by id) 
+
+	
+	
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 2+((row_number() over (order by g.account_name))*0.1), 'Rsrv'
+	FROM transactions.gl_account_transaction_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	AND v.tran_date BETWEEN from_ AND to_
+	AND g.parent_gl_account_id=_parent_reserve_gl_id GROUP BY g.account_name;
+	
+	
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Rsrv') t
+	WHERE _t.sn='२';
+	
+	-- OTHER RESERVE FUND
+	
+	INSERT INTO _t(sn, title, debit, credit) SELECT '३', 'अन्य कोष','0', '0';
+	--row_number() over (order by id) 
+
+	SELECT gl_account_id INTO _other_reserve_gl_id FROM core.gl_accounts WHERE account_name='Other Reserve Fund';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 3+((row_number() over (order by g.account_name))*0.1), 'Oth'
+	FROM transactions.gl_account_transaction_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	AND v.tran_date BETWEEN from_ AND to_
+	AND g.parent_gl_account_id=_other_reserve_gl_id GROUP BY g.account_name;
+	
+	
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Oth') t
+	WHERE _t.sn='३';
+	
+	
+	
+	INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'निक्षेप हिसाब', '0', '0' ,'४' ;
+	
+	
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')), SUM(COALESCE(v.credit,'0')), 4 +((row_number() over (order by g.account_name))*0.1), 'Dep'
+	FROM deposit.transaction_view v 
+	INNER JOIN deposit.account_holders a ON v.account_number_id = a.account_number_id
+	INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id
+	INNER JOIN core.gl_accounts g ON p.gl_account_id = g.gl_account_id
+	AND v.tran_date BETWEEN from_ AND to_
+	GROUP by g.account_name;
+	
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Dep') t
+	WHERE _t.sn='४';
+
+--Loan Payable
+
+	INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'लिएकाे ऋण हिसाब', '0', '0' ,'७' ;
+	
+	
+	SELECT gl_account_id INTO _parent_loan_payble_gl_id FROM core.gl_accounts WHERE account_name='Loan Payables';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 7+((row_number() over (order by g.account_name))*0.1), 'LP'
+	FROM transactions.gl_account_transaction_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	AND g.parent_gl_account_id=_parent_loan_payble_gl_id AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='LP') t
+	WHERE _t.sn='७';
+	
+	--Payables 
+	
+	INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'तिर्नुपर्ने दायित्व', '0', '0' ,'८' ;
+	
+	SELECT gl_account_id INTO _payable_gl_id FROM core.gl_accounts WHERE account_name='Payables';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 8+((row_number() over (order by g.account_name))*0.1), 'PL'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	--AND g.parent_gl_account_id=_payable_gl_id 
+	AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_payable_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='PL') t
+	WHERE _t.sn='८';
+
+--DONATION PAYABLE
+
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'अनुदान हिसाब', '0', '0' ,'१२' ;
+	
+	SELECT gl_account_id INTO _donation_gl_id FROM core.gl_accounts WHERE account_name='Donations A/C';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 12+((row_number() over (order by g.account_name))*0.1), 'DA'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	--AND g.parent_gl_account_id=_payable_gl_id 
+	AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_donation_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='DA') t
+	WHERE _t.sn='१२';
+	
+	
+--Assets
+INSERT INTO _t(title, debit, credit)
+	SELECT 'सम्पत्ति', '0', '0'  ;
+--cash
+
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'नगद हिसाब', '0', '0' ,'५' ;
+	
+	SELECT gl_account_id INTO _cash_gl_id FROM core.gl_accounts WHERE account_name='Cash';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 5+((row_number() over (order by g.account_name))*0.1), 'Cash'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	AND g.parent_gl_account_id=_cash_gl_id 
+	--AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_income_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Cash') t
+	WHERE _t.sn='५';
+--Bank
+
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'बैँक हिसाब', '0', '0' ,'६' ;
+	
+	SELECT gl_account_id INTO _bank_gl_id FROM core.gl_accounts WHERE account_name='Bank A/C';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 6+((row_number() over (order by g.account_name))*0.01), 'Bank'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	AND g.parent_gl_account_id=_bank_gl_id 
+	--AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_income_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Bank') t
+	WHERE _t.sn='६';
+
+--Loan investment
+
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'ऋण लगानी हिसाब', '0', '0' ,'१०' ;
+	
+	SELECT gl_account_id INTO _bank_gl_id FROM core.gl_accounts WHERE account_name='Bank A/C';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')), SUM(COALESCE(v.credit,'0')), 10 +((row_number() over (order by g.account_name))*0.1), 'Loan'
+	FROM loan.principal_transaction_view v 
+	INNER JOIN loan.loan_grant a ON v.loan_id = a.loan_id
+	INNER JOIN loan.loan_products p ON a.loan_product_id = p.loan_product_id
+	INNER JOIN core.gl_accounts g ON p.gl_account_id = g.gl_account_id
+	AND v.tran_date BETWEEN from_ AND to_
+	GROUP by g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Loan') t
+	WHERE _t.sn='१०';
+	
+	--Assets 
+	
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'सम्पत्ति हिसाब', '0', '0' ,'११' ;
+	
+	SELECT gl_account_id INTO _assets_gl_id FROM core.gl_accounts WHERE account_name='Other Assets';
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 11+((row_number() over (order by g.account_name))*0.01), 'OtherAsset'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_assets_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='OtherAsset') t
+	WHERE _t.sn='११';
+	
+	--Receivable amount
+		
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'पेश्कि तथा पाउनुपर्ने हिसाब', '0', '0' ,'१३' ;
+	
+	SELECT gl_account_id INTO _receivable_gl_id FROM core.gl_accounts WHERE account_name='Receivables';
+	
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 13+((row_number() over (order by g.account_name))*0.01), 'Rec'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	AND g.parent_gl_account_id=_receivable_gl_id 
+	--AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_income_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Rec') t
+	WHERE _t.sn='१३';
+	
+--Expenses
+
+		
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'खर्च हिसाब', '0', '0' ,'१४' ;
+	
+	SELECT gl_account_id INTO _expenses_gl_id FROM core.gl_accounts WHERE account_name='Expenses';
+	
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 14+((row_number() over (order by g.account_name))*0.01), 'Exp'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	--AND g.parent_gl_account_id=_receivable_gl_id 
+	AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_expenses_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Exp') t
+	WHERE _t.sn='१४';
+
+	
+
+---Incomes
+INSERT INTO _t(title, debit, credit, sn)
+	SELECT 'आम्दानी हिसाब', '0', '0' ,'१५' ;
+	
+	SELECT gl_account_id INTO _income_gl_id FROM core.gl_accounts WHERE account_name='Incomes';
+
+	INSERT INTO _t(title, debit, credit, sn, dtl)
+	SELECT '    '||g.account_name, SUM(COALESCE(v.debit,'0')),SUM(COALESCE(v.credit,'0')) , 15+((row_number() over (order by g.account_name))*0.1), 'Inc'
+	FROM transactions.mv_transactions_view v
+	INNER JOIN core.gl_accounts g ON v.gl_account_id= g.gl_account_id
+	--AND g.parent_gl_account_id=_payable_gl_id 
+	AND v.gl_account_id IN (SELECT unnest(core.get_child_accounts(_income_gl_id)))
+	AND v.tran_date BETWEEN from_ AND to_  GROUP BY g.account_name;
+
+	UPDATE _t SET debit= t.dr, credit=t.cr
+	FROM (SELECT SUM(_t.debit) dr, SUM(_t.credit) cr FROM _t WHERE _t.dtl='Inc') t
+	WHERE _t.sn='१५';
+
+	RETURN QUERY(SELECT _t.sn, _t.title, ''::character varying(150), _t.debit, _t.credit FROM _t ORDER BY id);
+END
+$BODY$;
+
+ALTER FUNCTION transactions.get_dms_report(integer, integer, date, date)
+    OWNER TO postgres;

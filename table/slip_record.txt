@@ -1,0 +1,73 @@
+CREATE TABLE IF NOT EXISTS deposit.slip_record(
+	slip_record_id bigserial UNIQUE PRIMARY KEY NOT NULL,
+	office_id bigint REFERENCES office.offices(office_id) NOT NULL,
+	status boolean NOT NULL DEFAULT true,
+	audit_user_id bigint REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS office_id_ix
+ON deposit.slip_record USING btree
+(office_id ASC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS audit_user_id_ix
+ON deposit.slip_record USING btree
+(audit_user_id ASC NULLS LAST);
+
+
+CREATE OR REPLACE FUNCTION deposit.insert_slip_record(
+	office_id_ bigint,
+	user_id_ bigint,
+	start_number_ int,
+	end_number_ int)
+	RETURNS void
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _counter int = $3;
+	BEGIN
+		IF 
+			$1 IN (SELECT office_id FROM office.offices) AND
+			$2 IN (SELECT user_id FROM office.users) AND
+			$3 > (SELECT MAX(slip_record_id) FROM deposit.slip_record) AND
+			$3 < $4
+		THEN
+			LOOP
+				INSERT INTO deposit.slip_record(slip_record_id, office_id, audit_user_id)
+				VALUES (_counter,$1,$2);
+
+				_counter := _counter + 1;
+				EXIT WHEN _counter > $4;
+			END LOOP;
+		ELSE
+			RAISE EXCEPTION 'ERROR DATA ENTRY!!';
+		END IF;
+	END
+$BODY$;
+
+
+CREATE OR REPLACE FUNCTION deposit.is_valid_slip(
+	office_id_ bigint,
+	slip_number_id_ bigint)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		IF NOT EXISTS (SELECT * FROM deposit.slip_record) 
+		THEN
+			RETURN true;
+		ELSE
+			IF 
+				$1 IN (SELECT office_id FROM deposit.slip_record) AND 
+				$2 IN (SELECT slip_record_id FROM deposit.slip_record)
+			THEN
+				RETURN true;
+			ELSE
+				RETURN false;
+			END IF;
+		END IF;
+	END
+$BODY$;

@@ -1,0 +1,82 @@
+
+CREATE OR REPLACE FUNCTION core.get_customer_balance(
+	office_id_ integer,
+	till_ date)
+    RETURNS TABLE(Sn bigint, member_id bigint, member_name text, contact_number text, saving_balance money, share_balance money, loan_balance money,office_id integer,address text)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+
+BEGIN
+	CREATE TEMP TABLE _t(
+		member_id bigint, 
+		member_name text, 
+		contact_number text, 
+		saving_balance money, 
+		share_balance money, 
+		loan_balance money,
+	    office_id integer,
+		address text
+	) ON COMMIT DROP;
+	
+	IF $1 > 0 THEN 	
+		INSERT INTO _t
+		SELECT c.customer_id,
+			c.customer_name,
+			c.contact_number,
+			'',
+			'',
+			'',
+			c.office_id,
+			c.permanent_address
+		FROM core.customers_view c
+		WHERE c.office_id = $1 ORDER BY c.customer_id;
+	ELSE
+		INSERT INTO _t
+		SELECT c.customer_id,
+			c.customer_name,
+			c.contact_number,
+			'',
+			'',
+			'',
+			c.office_id,
+			c.permanent_address
+		FROM core.customers_view c ORDER BY c.customer_id;
+	END IF;
+
+--  #Saving
+	UPDATE _t SET saving_balance= r.bal
+	FROM(SELECT _t.member_id, SUM(credit)-SUM(debit) bal 
+	FROM deposit.mv_transaction_view t INNER JOIN deposit.account_holders g ON t.account_number_id = g.account_number_id
+	INNER JOIN _t ON _t.member_id = g.customer_id AND t.tran_date<=$2 GROUP BY _t.member_id)r
+	WHERE _t.member_id = r.member_id;
+	
+--  #Share
+	UPDATE _t SET share_balance= r.bal
+	FROM(SELECT _t.member_id, COALESCE(SUM(credit)-SUM(debit),'0') bal 
+	FROM core.share_transaction_view t INNER JOIN core.share_accounts g ON t.share_account_id = g.share_account_id
+	INNER JOIN _t ON _t.member_id = g.customer_id AND t.tran_date<=$2 GROUP BY _t.member_id)r
+	WHERE _t.member_id = r.member_id;
+	
+--  #Loan
+	UPDATE _t SET loan_balance= r.bal
+	FROM(SELECT _t.member_id, SUM(debit)-SUM(credit) bal 
+	FROM loan.principal_transaction_view t INNER JOIN loan.loan_grant g ON t.loan_id = g.loan_id
+	INNER JOIN _t ON _t.member_id = g.customer_id AND t.tran_date<=$2 GROUP BY _t.member_id)r
+	WHERE _t.member_id = r.member_id;
+	--DELETE 0 values rows
+	DELETE FROM _t WHERE COALESCE(_t.saving_balance,'0')='0' AND 
+	COALESCE(_t.share_balance,'0')='0' AND COALESCE(_t.loan_balance,'0') ='0'; 
+	
+	INSERT INTO _t(contact_number, saving_balance, share_balance, loan_balance)
+	SELECT '	TOTAL',
+	SUM(_t.saving_balance),
+	SUM(_t.share_balance),
+	SUM(_t.loan_balance)
+	FROM _t;
+	
+	RETURN QUERY(SELECT ROW_NUMBER() OVER (), _t.* FROM _t );
+	
+END
+$BODY$;

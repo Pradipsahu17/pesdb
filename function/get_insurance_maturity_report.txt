@@ -1,0 +1,74 @@
+CREATE OR REPLACE FUNCTION insurance.get_insurance_maturity_report(
+	office_id_ integer)
+    RETURNS TABLE(office_id integer, insurance_id integer, member_name text, address text, loan_account_number character varying, insured_date character varying, expiry_date character varying, company_name character varying, insurance_item_name character varying, insured_amount money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE date_ date := (select core.get_date());
+	BEGIN
+		CREATE TEMP TABLE _t(
+			office_id integer,
+			insurance_id integer,
+			member_id bigint,
+			member_name text,
+			address text,
+			loan_account_number character varying(50),
+			insured_date character varying,
+			expiry_date character varying,
+			company_name character varying(50),
+			insurance_item_name character varying(50),
+			insured_amount money,
+			sms_count bigint) ON COMMIT DROP;
+	
+		IF $1 = 0 THEN
+			INSERT INTO _t(office_id,insurance_id,member_id,member_name,address,loan_account_number,insured_date,expiry_date, company_name,insurance_item_name,insured_amount) 
+			SELECT s.office_id,
+				s.insurance_id,
+				s.customer_id,
+				s.customer_name,
+				s.permanent_address,
+				s.loan_account_number,
+				core.date_bs_from_ad(s.insured_date::date),
+				core.date_bs_from_ad(s.expiry_date::date),
+				s.company_name,
+				s.insurance_item_name,
+				s.insured_amount
+		   FROM insurance.insurance_view s
+		   WHERE s.expiry_date < date_;
+		   
+		ELSE
+		
+			INSERT INTO _t(office_id,insurance_id,member_id,member_name,address,loan_account_number,insured_date,expiry_date, company_name,insurance_item_name,insured_amount) 
+			SELECT s.office_id,
+				s.insurance_id,
+				s.customer_id,
+				s.customer_name,
+				s.permanent_address,
+				s.loan_account_number,
+				core.date_bs_from_ad(s.insured_date::date),
+				core.date_bs_from_ad(s.expiry_date::date),
+				s.company_name,
+				s.insurance_item_name,
+				s.insured_amount
+		   FROM insurance.insurance_view s
+		   WHERE s.office_id = $1
+		   AND s.expiry_date < date_;
+		   
+		END IF;
+		
+		UPDATE _t SET sms_count = s.total
+			FROM (SELECT  sms_log.customer_id::bigint,count(*) total, sms_sent_date from sms.sms_log
+				WHERE service_type='Birthday'
+				AND sms_sent_date::date = date_ 
+		GROUP BY sms_log.customer_id, sms_sent_date ) s
+			WHERE _t.member_id = s.customer_id::bigint;
+			
+		DELETE FROM _t WHERE sms_count>0;
+						   
+		RETURN QUERY(SELECT _t.office_id, _t.insurance_id, _t.member_name, _t.address, _t.loan_account_number, _t.insured_date, _t.expiry_date, _t.company_name, _t.insurance_item_name, _t.insured_amount FROM _t);
+	END
+		
+$BODY$;

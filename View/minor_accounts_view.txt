@@ -1,0 +1,24 @@
+CREATE OR REPLACE VIEW core.minor_accounts_view
+ AS
+ SELECT c.customer_id,
+    c.office_id,
+    c.date_of_application,
+    array_to_string(array_agg(m.full_name), ', '::text) AS customer_name,
+    array_to_string(array_agg(m.permanent_address), ', '::text) AS permanent_address,
+    array_to_string(array_agg(m.cell_number), ', '::text) AS contact_number,
+    array_to_string(array_agg(m.father_name), ', '::text) AS father_name,
+    array_to_string(array_agg(m.grand_father_name), ', '::text) AS grand_father_name,
+	cv.customer_name AS Guardian_name,
+	cv.contact_number AS Guardian_contact,
+    c.is_residential,
+    array_to_string(array_agg(m.date_of_birth), ', '::text) AS date_of_birth,
+    c.is_minor,
+    u.unit_name,
+    array_to_string(array_agg(g.gender_name), ', '::text) AS gender_name,
+    c.status
+   FROM core.minor_accounts m
+   INNER JOIN core.customers c ON m.customer_id = c.customer_id
+   INNER JOIN core.customers_view cv ON m.guardian_id = cv.customer_id
+   LEFT JOIN office.units u ON c.unit_id = u.unit_id
+   INNER JOIN core.genders g ON m.gender_id = g.gender_id
+   GROUP BY c.customer_id, c.office_id, c.date_of_application, c.is_residential, c.is_minor, u.unit_name, c.status,cv.customer_name, cv.contact_number;;

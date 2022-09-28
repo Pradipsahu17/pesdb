@@ -1,0 +1,74 @@
+CREATE OR REPLACE FUNCTION core.get_share_transaction_report(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	trans_type_ character varying,
+	product_id_ integer,
+	user_id_ integer,
+	ibt_type_ smallint,
+	cash_type_ smallint)
+    RETURNS TABLE(tran_id bigint, tran_date date, value_date date, product integer, customer_id bigint, share_account_id bigint, debit money, credit money, statement_reference text, user_id integer, ibt_tran_id bigint) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+	DECLARE _trans		character varying(50);
+	DECLARE _product 	character varying(50);
+	DECLARE _collector	character varying(50);
+	DECLARE _user		character varying(50);
+	DECLARE _return_query	text;
+	DECLARE _total_query	text;
+	DECLARE _ibt        character varying(150);
+    DECLARE _cash       character varying(150);
+BEGIN
+	IF $1 = 0 THEN
+		_return_query := 
+			'SELECT t.tran_id, t.tran_date::date, t.value_date::date, a.share_product_id::int, a.customer_id, 
+			t.share_account_id, t.debit, t.credit, t.statement_reference::text, t.user_id, transactions.get_ibt_tran_id(t.tran_id)
+			FROM core.share_transaction_view t
+			INNER JOIN core.share_accounts a ON t.share_account_id = a.share_account_id
+			WHERE t.tran_date::date BETWEEN ''' || from_ ||''' AND ''' || to_  ||'''';
+	ELSE
+		_return_query := 
+        'SELECT t.tran_id, t.tran_date::date, t.value_date::date, a.share_product_id::int, a.customer_id, 
+        t.share_account_id, t.debit, t.credit, t.statement_reference::text, t.user_id, transactions.get_ibt_tran_id(t.tran_id)
+        FROM core.share_transaction_view t
+        INNER JOIN core.share_accounts a ON t.share_account_id = a.share_account_id
+        WHERE t.office_id = '|| office_id_ ||
+        ' AND t.tran_date::date BETWEEN ''' || from_ ||''' AND ''' || to_  ||'''';
+	END IF;
+
+	IF LOWER(trans_type_) = 'dr' THEN
+        _return_query := _return_query || ' AND COALESCE(t.debit, 0::money) <> 0::money';
+    ELSIF LOWER(trans_type_) = 'cr' THEN
+        _return_query := _return_query || ' AND COALESCE(t.credit, 0::money) <> 0::money';
+	END IF;
+
+	IF COALESCE(product_id_, 0) > 0 THEN
+        _return_query := _return_query || ' AND a.share_product_id = '|| product_id_ ;
+	END IF;
+	
+	IF COALESCE(user_id_, 0) > 0 THEN
+		_return_query := _return_query || ' AND t.user_id = '||user_id_;
+	END IF;
+
+    IF COALESCE(ibt_type_ = 2) THEN
+        _return_query := _return_query || ' AND transactions.get_ibt_tran_id(t.tran_id) IS NOT NULL';
+    ELSIF COALESCE(ibt_type_ = 0) THEN
+    
+    ELSE
+        _return_query := _return_query || ' AND transactions.get_ibt_tran_id(t.tran_id) IS NULL';
+    END IF;
+
+    IF COALESCE(cash_type_, 0) = 0 THEN
+        _return_query := _return_query || ' AND transactions.is_cash_tran(t.tran_id) = false';
+    ELSIF COALESCE(cash_type_, 0) = 1 THEN
+        _return_query := _return_query || ' AND transactions.is_cash_tran(t.tran_id) = true';
+    END IF;
+
+	RETURN QUERY EXECUTE _return_query;
+END
+$BODY$;

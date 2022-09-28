@@ -1,0 +1,34 @@
+CREATE OR REPLACE VIEW core.minor_accounts_view
+ AS
+	SELECT m.minor_account_id,
+    	m.full_name,
+		m.nepali_name,
+		c.permanent_address,
+    	c.temporary_address,
+		c.nepali_address,
+		m.guardian_id,
+		c.customer_name AS guardian_name,
+		c.nepali_name AS guardian_name_np,
+		r.relation_name,
+		m.cast_id,
+		cc.cast_name,
+    	m.gender_id,
+		g.gender_name,
+    	m.date_of_birth,
+    	m.date_of_birth_bs,
+    	m.age,
+    	m.birth_place,
+    	m.birth_certificate_number,
+    	m.birth_certificate_issue_place,
+		m.issued_date,
+    	m.father_name,
+    	m.father_contact_number,
+    	m.mother_name,
+    	m.mother_contact_number,
+    	m.cell_number,
+    	m.audit_user_id
+	FROM core.minor_accounts m
+	INNER JOIN core.customers_view c ON c.customer_id = m.guardian_id
+	INNER JOIN core.relation r ON m.relation_id = r.relation_id
+	INNER JOIN core.cast_catagories cc ON cc.cast_id = m.cast_id
+	INNER JOIN core.genders g ON g.gender_id = m.gender_id;

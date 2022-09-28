@@ -1,0 +1,25 @@
+-- select * from insurance.get_insurance_renew(1)
+
+-- DROP FUNCTION insurance.get_insurance_renew(integer)
+
+CREATE OR REPLACE FUNCTION insurance.get_insurance_renew(
+	insurance_id_ integer,
+	renew_date_ date,
+	duration_ integer,
+	user_id_ integer)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN		
+		UPDATE insurance.insurance_setup 
+		SET renew_date = $2::timestamp without time zone, is_renewed = true ,duration = $3
+		WHERE insurance_id = $1;		
+		
+		INSERT INTO insurance.insurance_renew (loan_id, renew_date, duration, is_expired, audit_user_id)
+		SELECT loan_id,$2,$3,false,$4 FROM insurance.insurance_setup WHERE insurance_id = $1;
+		
+		RETURN true;
+	END
+$BODY$;

@@ -1,0 +1,46 @@
+-- select * from transactions.share_issue
+
+-- select * from transactions.share_issue_details
+
+-- select * from transactions.insert_into_share_issue(1,5,67)
+
+CREATE OR REPLACE FUNCTION transactions.insert_into_share_issue(
+	user_id_ integer,
+	issued_units_ integer,
+	begins_from_ integer)
+	RETURNS void
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _share_issue_id bigint;
+DECLARE i integer := $3;
+DECLARE j integer;
+	BEGIN
+		IF $3 > (SELECT COALESCE(MAX(kitta_no),0) FROM transactions.share_issue_details)
+		AND $3 < (SELECT COALESCE(MAX(kitta_no)+2,2) FROM transactions.share_issue_details)
+		THEN
+			INSERT INTO transactions.share_issue(issued_by_id, issued_date, issued_units, begins_from, audit_user_id)
+			SELECT $1,
+				core.get_date(),
+				$2,
+				$3,
+				$1;
+			
+			SELECT CURRVAL('transactions.share_issue_share_issue_id_seq') INTO _share_issue_id;
+
+		ELSE
+			RAISE EXCEPTION 'USE SELECT transactions.get_max_kitta_no() for valid begins_from_';
+		END IF;
+		
+		j := (SELECT  SUM(issued_units + begins_from - 1) FROM transactions.share_issue WHERE share_issue_id = _share_issue_id);
+		
+		LOOP
+			INSERT INTO transactions.share_issue_details(kitta_no, share_issue_id, audit_user_id)
+			SELECT i, _share_issue_id, $1;
+			
+			i = i + 1;
+			EXIT WHEN i > j;
+		END LOOP;
+	END
+$BODY$;

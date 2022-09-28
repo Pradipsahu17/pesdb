@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS atm.atm_account_setup(
+	atm_account_setup_id serial PRIMARY KEY UNIQUE NOT NULL,
+	account_type character varying NOT NULL,
+	gl_account_id bigint NOT NULL,
+	account_number character varying,
+	audit_user_id integer REFERENCES office.users(user_id) NOT NULL,
+	audit_ts timestamp with time zone DEFAULT now()
+);
+
+
+
+-- ONLY FOR HAMRONAMUNA
+INSERT INTO atm.atm_account_setup(account_type, gl_account_id, account_number, audit_user_id) VALUES
+('VOSTRO',45,'01-CA-09199',1),
+('OWNERSHIP',46,'01-CA-09200',1),
+('ATM CHARGE',47,'01-CA-09201',1),
+('ATM ANNUAL CHARGE',48,'',1);

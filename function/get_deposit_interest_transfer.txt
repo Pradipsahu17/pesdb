@@ -1,0 +1,55 @@
+
+-- select * from deposit.get_interest_transfer(0,'2021-10-10','2021-10-10')
+
+CREATE OR REPLACE FUNCTION deposit.get_interest_transfer(
+	office_id_ integer,
+	from_ date,
+	to_ date)
+	RETURNS TABLE(office_id integer, tran_id bigint, value_date date, member_name text, address text, contact text, account_number character varying, nominee_account character varying, interest numeric, tax numeric, auto_posted boolean)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	IF $1 = 0 THEN
+		RETURN QUERY(
+			SELECT i.office_id,
+				i.trans_id,
+				i.value_date,
+				c.customer_name,
+				c.permanent_address,
+				c.contact_number,
+				a.account_number,
+				h.account_number AS nominee_account,
+				i.interest,
+				i.tax,
+				i.auto_posted
+			FROM deposit.interest_transfer_view i
+			INNER JOIN deposit.account_holders a ON i.account_number_id = a.account_number_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id 
+			INNER JOIN deposit.account_holders h ON i.nominee_account_number_id = h.account_number_id
+			WHERE i.value_date BETWEEN $2 AND $3
+		);
+	ELSE
+		RETURN QUERY
+			(SELECT i.office_id,
+				i.trans_id,
+				i.value_date,
+				c.customer_name,
+				c.permanent_address,
+				c.contact_number,
+				a.account_number,
+				h.account_number AS nominee_account,
+				i.interest,
+				i.tax,
+				i.auto_posted
+			FROM deposit.interest_transfer_view i
+			INNER JOIN deposit.account_holders a ON i.account_number_id = a.account_number_id
+			INNER JOIN core.customers_view c ON a.customer_id = c.customer_id 
+			INNER JOIN deposit.account_holders h ON i.nominee_account_number_id = h.account_number_id
+			WHERE i.value_date BETWEEN $2 AND $3
+			AND i.office_id = $1
+		);
+	END IF;
+END
+$BODY$;

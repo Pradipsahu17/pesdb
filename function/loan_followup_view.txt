@@ -1,0 +1,41 @@
+-- View: loan.loan_followup_view
+
+-- DROP VIEW loan.loan_followup_view;
+
+CREATE OR REPLACE VIEW loan.loan_followup_view
+ AS
+ SELECT g.office_id,
+ 	f.loan_followup_id,
+    f.loan_id,
+    g.loan_account_number,
+    p.loan_product_name,
+    f.followup_date,
+    d.date_in_bs AS followup_date_bs,
+    f.next_followup_date,
+    e.date_in_bs AS next_followup_date_bs,
+    c.customer_name AS member_name,
+    c.permanent_address AS address,
+    c.contact_number,
+    concat(a.account_number, s.account_number)::character varying(50) AS nominee_account,
+    concat(cc.customer_name, ccc.customer_name) AS nominee_name,
+    concat(cc.permanent_address, ccc.permanent_address) AS nominee_address,
+    concat(cc.contact_number, ccc.contact_number) AS nominee_contact,
+    f.replied_by_member,
+    u.full_name AS audit_user_name,
+    f.audit_ts
+   FROM loan.loan_followup f
+     JOIN loan.loan_grant g ON f.loan_id = g.loan_id
+     JOIN office.users u ON f.audit_user_id = u.user_id
+     JOIN core.customers_view c ON g.customer_id = c.customer_id
+     JOIN core.date_conversion d ON f.followup_date = d.date_in_ad
+     JOIN core.date_conversion e ON f.next_followup_date = e.date_in_ad
+     JOIN loan.loan_products p ON g.loan_product_id = p.loan_product_id
+     LEFT JOIN loan.loan_guarantee lg ON lg.loan_id = f.loan_id
+     LEFT JOIN deposit.account_holders a ON lg.account_number_id = a.account_number_id
+     LEFT JOIN core.share_accounts s ON lg.share_account_id = s.share_account_id
+     LEFT JOIN core.customers_view cc ON a.customer_id = cc.customer_id
+     LEFT JOIN core.customers_view ccc ON s.customer_id = ccc.customer_id;
+
+ALTER TABLE loan.loan_followup_view
+    OWNER TO postgres;
+

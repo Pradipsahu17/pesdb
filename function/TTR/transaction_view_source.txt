@@ -1,0 +1,23 @@
+-- SELECT * FROM loan.transaction_view_source
+
+-- DROP VIEW loan.transaction_view_source;
+
+CREATE OR REPLACE VIEW loan.transaction_view_source
+ AS
+ SELECT t.tran_id,
+    a.customer_id,
+    a.customer_name,
+    a.permanent_address,
+    t.office_id,
+    t.tran_date,
+    t.book_name,
+    a.loan_id,
+    a.loan_account_number,
+    tr.credit,
+    i.income_source_name AS source_of_fund,
+    tr.source_other AS remarks
+   FROM transactions.transaction_details tr
+     JOIN transactions.transactions t ON tr.tran_id = t.tran_id
+     JOIN loan.loan_grant_view a ON tr.loan_id = a.loan_id
+     JOIN core.income_source i ON tr.source_detail_id = i.income_source_id
+  WHERE tr.credit >= '$1,000,000.00'::money;

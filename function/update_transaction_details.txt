@@ -1,0 +1,27 @@
+-- select * from transactions.update_transaction_details(null::bigint, null::bigint, null::bigint, null::bigint, null, '98', null, 46921, 20084)
+
+CREATE OR REPLACE FUNCTION transactions.update_transaction_details(
+	account_number_id_ bigint,
+	loan_id_ bigint,
+	gl_account_id_ bigint,
+	share_account_id_ bigint,
+	credit_ money,
+	debit_ money,
+	statement_reference_ character varying,
+	transaction_detail_id_ bigint,
+	tran_id_ bigint)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		UPDATE transactions.transaction_details t SET
+		account_number_id = COALESCE($1,t.account_number_id) , loan_id = COALESCE($2,t.loan_id), 
+		gl_account_id = COALESCE($3,t.gl_account_id), share_account_id = COALESCE($4,t.share_account_id),
+		credit = COALESCE($5,t.credit), debit = COALESCE($6,t.debit), statement_reference = COALESCE($7,t.statement_reference)		
+		WHERE t.transaction_detail_id = $8 AND t.tran_id = $9;
+		
+		RETURN true;
+	END
+$BODY$;

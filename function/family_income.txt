@@ -1,0 +1,27 @@
+
+-- DROP TABLE IF EXISTS core.family_income;
+
+CREATE TABLE IF NOT EXISTS core.family_income
+(
+    family_income_id bigserial,
+    customer_id bigint NOT NULL,
+    company_name character varying COLLATE pg_catalog."default" NOT NULL,
+    company_name_np character varying COLLATE pg_catalog."default",
+    f_notes character varying COLLATE pg_catalog."default",
+    average_monthly_income integer,
+    average_yearly_income integer,
+    company_address character varying(255) COLLATE pg_catalog."default",
+    audit_user_id bigint NOT NULL,
+    audit_ts timestamp with time zone DEFAULT now(),
+    f_relation character varying(255) COLLATE pg_catalog."default",
+    f_family_member_name character varying(255) COLLATE pg_catalog."default",
+    CONSTRAINT family_income_pkey PRIMARY KEY (family_income_id),
+    CONSTRAINT family_income_audit_user_id_fkey FOREIGN KEY (audit_user_id)
+        REFERENCES office.users (user_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT family_income_customer_id_fkey FOREIGN KEY (customer_id)
+        REFERENCES core.customers (customer_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+);

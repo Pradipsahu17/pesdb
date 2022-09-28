@@ -1,0 +1,14 @@
+CREATE OR REPLACE view loan.loan_application_comments_view
+  AS
+  SELECT l.comment_id,
+  	l.application_id,
+	l.commented_by,
+	u.user_name,
+	e.photo,
+	l.comment,
+	l.audit_ts
+  FROM loan.loan_application_comments l
+  INNER JOIN office.users u
+  	ON l.commented_by = u.user_id
+  LEFT JOIN office.employee_info e
+  	ON l.commented_by = e.user_id;

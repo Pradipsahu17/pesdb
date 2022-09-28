@@ -1,0 +1,111 @@
+--  DROP FUNCTION deposit.get_userwise_account_opening_report(integer,integer) 
+
+-- select * from deposit.get_userwise_account_opening_report(0,4,'Deposit')
+
+CREATE OR REPLACE FUNCTION deposit.get_userwise_account_opening_report(
+	office_id_ integer,
+	user_id_ integer,
+	account_type_ character varying)
+	RETURNS TABLE(sn bigint, office_name character varying, customer_id bigint, account_open_date character varying, account_number character varying, member_name text, member_address text, contact_number text, product_name character varying, interest_rate numeric, audit_user character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		CREATE TEMP TABLE _t(
+			office_name character varying, 
+			customer_id bigint, 
+			account_open_date character varying, 
+			account_number character varying, 
+			member_name text, 
+			member_address text, 
+			contact_number text, 
+			product_name character varying, 
+			interest_rate numeric, 
+			audit_user character varying
+		) ON COMMIT DROP;
+	
+		IF $3 = 'Deposit' THEN
+			-- DEPOSIT
+			INSERT INTO _t
+			SELECT o.nick_name,
+				a.customer_id,
+				core.date_bs_from_ad(a.account_open_date::date),
+				a.account_number,
+				c.customer_name,
+				c.permanent_address,
+				c.contact_number,
+				p.deposit_product_name,
+				a.interest_rate::numeric,
+				u.user_name
+			FROM deposit.account_holders a
+			INNER JOIN core.customers_view c 
+				ON a.customer_id = c.customer_id
+			INNER JOIN core.deposit_products p 
+				ON a.deposit_product_id = p.deposit_product_id
+			INNER JOIN office.offices o 
+				ON a.office_id = o.office_id
+			INNER JOIN office.users u 
+				ON a.audit_user_id = u.user_id
+			WHERE a.is_active = true;
+			
+		ELSEIF $2 = 'Loan' THEN
+			-- LOAN	
+			INSERT INTO _t
+			SELECT o.nick_name,
+				g.customer_id,
+				core.date_bs_from_ad(g.issue_date::date),
+				g.loan_account_number,
+				c.customer_name,
+				c.permanent_address,
+				c.contact_number,
+				p.loan_product_name,
+				g.annual_interest_rate::NUMERIC,
+				u.user_name
+			FROM loan.loan_grant g
+			INNER JOIN core.customers_view c 
+				ON g.customer_id = c.customer_id
+			INNER JOIN loan.loan_products p 
+				ON g.loan_product_id = p.loan_product_id
+			INNER JOIN office.offices o 
+				ON g.office_id = o.office_id
+			INNER JOIN office.users u 
+				ON g.audit_user_id = u.user_id
+			WHERE g.is_dead = false;
+
+		ELSEIF $3 = 'Share' THEN
+			-- SHARE
+			INSERT INTO _t
+			SELECT o.nick_name,
+				s.customer_id,
+				core.date_bs_from_ad(s.account_open_date::date),
+				s.account_number,
+				c.customer_name,
+				c.permanent_address,
+				c.contact_number,
+				p.share_product_name,
+				null::numeric,
+				u.user_name
+			FROM core.share_accounts s 
+			INNER JOIN core.customers_view c 
+				ON s.customer_id = c.customer_id
+			INNER JOIN core.share_products p 
+				ON p.share_product_id = s.share_product_id
+			INNER JOIN office.offices o 
+				ON s.office_id = o.office_id
+			INNER JOIN office.users u 
+				ON s.audit_user_id = u.user_id
+			WHERE s.status = true;
+		END IF;
+		
+		IF $1 > 0 THEN
+			DELETE FROM _t WHERE office_name <> (SELECT o.office_name FROM office.offices o WHERE o.office_id = $1);
+		END IF;
+		
+		IF $2 > 0 THEN
+			DELETE FROM _t WHERE _t.audit_user <> (SELECT u.user_name FROM office.users u WHERE u.user_id = $2);
+		END IF;
+		
+		RETURN QUERY(SELECT ROW_NUMBER() OVER(),* FROM _t);
+	END
+$BODY$;

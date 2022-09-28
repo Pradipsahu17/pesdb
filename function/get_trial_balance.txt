@@ -1,0 +1,100 @@
+-- FUNCTION: transactions.get_trial_balance(integer, integer, date, date)
+
+-- DROP FUNCTION IF EXISTS transactions.get_trial_balance(integer, integer, date, date);
+
+CREATE OR REPLACE FUNCTION transactions.get_trial_balance(
+	office_id_ integer,
+	user_id_ integer,
+	from_ date,
+	to_ date)
+    RETURNS TABLE(title text, opening_dr money, opening_cr money, curr_debit money, curr_credit money, closing_dr money, closing_cr money, is_heading integer) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	DECLARE _gl_account_id	bigint;
+	DECLARE _row		core.char_khata%rowtype;
+BEGIN
+	CREATE TEMP TABLE _t(id serial not null primary key, gl_id bigint, gl_name character varying(250), op_dr money, op_cr money, debit money, credit money, cl_dr money, cl_cr money, group_id int) ON COMMIT DROP;
+	
+	DELETE FROM core.temp_report WHERE user_id = $2 AND details='difftb';
+
+	IF office_id_ = 0 THEN
+		INSERT INTO core.temp_report(gl_account_id, debit, credit, details, user_id)
+		SELECT t.gl_account_id, 
+			CASE WHEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit, '0')),'0') ELSE NULL END debit,
+			CASE WHEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') ELSE NULL END credit,
+			'difftb', $2
+		FROM transactions.mv_transactions_view t
+		WHERE tran_date BETWEEN $3 AND $4
+		GROUP BY t.gl_account_id;
+	ELSE
+		INSERT INTO core.temp_report(gl_account_id, debit, credit, details, user_id)
+		SELECT t.gl_account_id, 
+			CASE WHEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit, '0')),'0') ELSE NULL END debit,
+			CASE WHEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') ELSE NULL END credit,
+			'difftb', $2
+		FROM transactions.mv_transactions_view t
+		WHERE tran_date BETWEEN $3 AND $4
+		AND office_id = $1
+		GROUP BY t.gl_account_id;
+	END IF;
+
+	INSERT INTO core.temp_report(gl_account_id, op_dr, op_cr, details, user_id)
+	SELECT t.gl_account_id, 
+		CASE WHEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.debit,'0')) - sum(COALESCE(t.credit, '0')),'0') ELSE NULL END debit,
+		CASE WHEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') > '0' THEN COALESCE(sum(COALESCE(t.credit,'0')) - sum(COALESCE(t.debit,'0')),'0') ELSE NULL END credit,
+		'difftb', $2
+	FROM transactions.mv_transactions_view t
+	WHERE tran_date < $3
+	AND office_id = $1
+	GROUP BY t.gl_account_id;
+
+	UPDATE core.temp_report SET parent_id = gl.parent_gl_account_id
+	FROM core.gl_accounts gl
+	WHERE core.temp_report.gl_account_id = gl.gl_account_id;
+
+	
+        FOR _row IN SELECT * FROM core.char_khata ORDER BY code
+        LOOP
+		SELECT _row.gl_account_id INTO _gl_account_id;
+		INSERT INTO _t(gl_id, op_dr, op_cr, debit, credit, group_id) SELECT _gl_account_id, null, null, null, null, 1;
+
+		INSERT INTO _t(gl_id, op_dr, op_cr, debit, credit, group_id) 
+		SELECT r.gl_account_id, SUM(COALESCE(r.op_dr,'0')), SUM(COALESCE(r.op_cr,'0')), SUM(COALESCE(r.debit,'0')), 
+		SUM(COALESCE(r.credit,'0')), _gl_account_id FROM core.temp_report r 
+		WHERE r.gl_account_id IN (SELECT unnest(core.get_child_accounts(_gl_account_id))) AND r.details='difftb' AND user_id = $2
+		GROUP BY r.gl_account_id;
+        END LOOP;
+
+ 	INSERT INTO _t(gl_id, op_dr, op_cr, debit, credit, group_id) SELECT tr.gl_account_id, SUM(COALESCE(tr.op_dr,'0')), SUM(COALESCE(tr.op_cr,'0')), SUM(COALESCE(tr.debit,'0')), SUM(COALESCE(tr.credit,'0')), 1 
+ 	FROM core.temp_report tr WHERE tr.gl_account_id NOT IN (select _t.gl_id FROM _t) AND tr.user_id = user_id_ AND tr.details = 'difftb' GROUP BY tr.gl_account_id;
+
+    	UPDATE _t SET debit = t.dr, credit=t.cr, op_dr = odr, op_cr = ocr
+    	FROM (
+    		SELECT _t.group_id gl, SUM(COALESCE(_t.debit, '0')) dr, SUM(COALESCE(_t.credit, '0')) cr, SUM(COALESCE(op_dr, '0')) odr, SUM(COALESCE(op_cr, '0')) ocr
+    		FROM _t GROUP BY _t.group_id
+    	) t WHERE t.gl = _t.gl_id;
+
+ 	DELETE FROM _t WHERE COALESCE(_t.debit,'0') = '0' AND COALESCE(_t.credit,'0') = '0' AND COALESCE(_t.op_dr, '0')='0' AND COALESCE(_t.op_cr, '0')='0';
+ 	UPDATE _t SET group_id = NULL WHERE group_id > 1;
+
+	UPDATE _t SET cl_dr = COALESCE(_t.op_dr, '0') + COALESCE(_t.debit), cl_cr = COALESCE(_t.op_cr, '0') + COALESCE(_t.credit);
+
+	UPDATE _t SET gl_name = l.account_name 
+	FROM core.gl_accounts l WHERE _t.gl_id = l.gl_account_id;
+
+	INSERT INTO _t(gl_name, op_dr, op_cr, debit, credit, cl_dr, cl_cr, group_id)
+ 	SELECT 'Total', SUM(coalesce(op_dr,'0')), SUM(coalesce(op_cr,'0')), SUM(coalesce(debit,'0')), 
+ 	SUM(coalesce(credit,'0')), SUM(coalesce(cl_dr,'0')), SUM(coalesce(cl_cr,'0')), 1 FROM _t WHERE _t.group_id IS NOT NULL;
+
+	RETURN QUERY(SELECT CASE WHEN _t.group_id = 1 THEN _t.gl_name::text ELSE '  '||_t.gl_name END, op_dr, op_cr, debit, credit, cl_dr, cl_cr, group_id 
+	FROM _t ORDER BY id );
+
+END
+$BODY$;
+
+ALTER FUNCTION transactions.get_trial_balance(integer, integer, date, date)
+    OWNER TO postgres;

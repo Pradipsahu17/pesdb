@@ -1,0 +1,9 @@
+--core.non_corporate_customers
+
+ALTER TABLE core.non_corporate_customers ADD COLUMN nepali_name character varying;
+ALTER TABLE core.non_corporate_customers ADD COLUMN nepali_address character varying;
+
+--core.corporate_customers
+
+ALTER TABLE core.corporate_customers ADD COLUMN nepali_name character varying;
+ALTER TABLE core.corporate_customers ADD COLUMN nepali_address character varying;

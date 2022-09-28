@@ -1,0 +1,70 @@
+-- FUNCTION: SELECT * FROM transactions.post_irregular_accounts(2,75,47,'2021-10-10','2021-11-11','1000')
+
+-- DROP FUNCTION IF EXISTS transactions.post_irregular_accounts(integer, integer, integer, date, date, money);
+
+CREATE OR REPLACE FUNCTION transactions.post_irregular_accounts(
+	office_id_ integer,
+	deposit_product_id_from_ integer,
+	deposit_product_id_to_ integer,
+	from_ date,
+	to_ date,
+	amount money)
+    RETURNS bigint
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _tran_id bigint;
+BEGIN
+	CREATE TEMP TABLE _tb(
+		customer_id bigint,
+		from_acc bigint,
+		from_balance money,
+		to_acc bigint,
+		to_balance money,
+		credit money,
+		insufficient_amount money
+	)ON COMMIT DROP;
+	
+	INSERT INTO _tb(customer_id, from_acc, from_balance, to_acc, to_balance, credit,insufficient_amount)
+	SELECT r.customer_id, 
+		r.from_acc, 
+		r.from_balance, 
+		r.to_acc, 
+		r.to_balance, 
+		r.credit,
+		'1000'-r.credit
+	FROM deposit.get_irregular_accounts($1,$2,$3,$4,$5,$6) r
+	WHERE r.from_acc IS NOT NULL
+	AND r.from_balance > $6;
+	
+	IF (SELECT COUNT(*) FROM _tb) = 0 THEN
+		RAISE EXCEPTION 'There is no any irregular accounts';
+		
+	ELSE
+		-- Transactions
+		INSERT INTO transactions.transactions(office_id, tran_date, value_date, reference_number, book_name, total_amount, teller_id, verification_status_id, verified_by_user_id, audit_user_id)
+		SELECT $1, core.get_date(), core.get_date(), 'Irregular Accounts Transfer', 'Saving Journal', sum(_tb.insufficient_amount), 0, 1, 0, 0
+		FROM _tb;
+
+		SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+		-- Transaction_details
+		-- DR
+		INSERT INTO transactions.transaction_details(tran_id, account_number_id, gl_account_id, debit, statement_reference, audit_user_id)
+		SELECT _tran_id, _tb.from_acc,p.gl_account_id, _tb.insufficient_amount, 'Balance Transafer From _tb.from_acc to _tb.to_acc', $1
+		FROM _tb
+		INNER JOIN deposit.account_holders a ON _tb.from_acc = a.account_number_id
+		INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id;
+
+		-- CR
+		INSERT INTO transactions.transaction_details(tran_id, account_number_id, gl_account_id, credit, statement_reference, audit_user_id)
+		SELECT _tran_id, _tb.to_acc,p.gl_account_id, _tb.insufficient_amount, 'Balance Transafer From _tb.from_acc to _tb.to_acc', $1
+		FROM _tb
+		INNER JOIN deposit.account_holders a ON _tb.to_acc = a.account_number_id
+		INNER JOIN core.deposit_products p ON a.deposit_product_id = p.deposit_product_id;
+	END IF;
+	
+	RETURN _tran_id;
+END
+$BODY$;

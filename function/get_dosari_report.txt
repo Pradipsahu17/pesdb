@@ -1,0 +1,80 @@
+-- SELECT * FROM core.get_dosari_report(0, '2010-10-10','2021-10-10')
+
+-- DROP FUNCTION IF EXISTS core.get_dosari_report(integer, date, date);
+
+CREATE OR REPLACE FUNCTION core.get_dosari_report(
+	office_id_ integer,
+	from_ date,
+	to_ date)
+    RETURNS TABLE(member_id bigint, member_name text, deposit_ac integer, loan_ac integer, share_ac integer, is_regular_deposit boolean, loan_payment boolean) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE i integer:= 1;
+BEGIN
+	CREATE TEMP TABLE t_(
+		member_id bigint, 
+		member_name text, 
+		deposit_ac integer, 
+		loan_ac integer, 
+		share_ac integer,
+		is_regular_deposit boolean,
+		loan_payment boolean) ON COMMIT DROP;
+	
+	IF $1 = 0 THEN
+		INSERT INTO t_(member_id, member_name, deposit_ac, loan_ac, share_ac)
+		SELECT s.member_id,
+			c.customer_name,
+			(SELECT COUNT(*) FROM deposit.account_holders a WHERE customer_id = s.member_id AND a.account_open_date BETWEEN $2 AND $3)::integer,
+			(SELECT COUNT(l.loan_id) FROM loan.loan_grant l WHERE customer_id = s.member_id AND l.issue_date BETWEEN $2 AND $3)::integer,
+			(SELECT COUNT(sh.share_account_id) FROM core.share_accounts sh WHERE customer_id = s.member_id AND sh.account_open_date BETWEEN $2 AND $3)::integer
+		FROM core.committee_setup s
+		INNER JOIN core.customers_view c
+			ON c.customer_id = s.member_id
+		GROUP BY s.member_id,c.customer_name;
+	ELSE
+		INSERT INTO t_(member_id, member_name, deposit_ac, loan_ac, share_ac)
+		SELECT s.member_id,
+			c.customer_name,
+			(SELECT COUNT(*) FROM deposit.account_holders a WHERE customer_id = s.member_id AND a.account_open_date BETWEEN $2 AND $3)::integer,
+			(SELECT COUNT(l.loan_id) FROM loan.loan_grant l WHERE customer_id = s.member_id AND l.issue_date BETWEEN $2 AND $3)::integer,
+			(SELECT COUNT(sh.share_account_id) FROM core.share_accounts sh WHERE customer_id = s.member_id AND sh.account_open_date BETWEEN $2 AND $3)::integer
+		FROM core.committee_setup s
+		INNER JOIN core.customers_view c
+			ON c.customer_id = s.member_id
+		WHERE c.office_id = $1
+		GROUP BY s.member_id,c.customer_name;
+	END IF;
+	
+	LOOP
+		IF (SELECT t_.deposit_ac FROM t_ WHERE t_.member_id = (SELECT e.member_id FROM core.committee_setup e WHERE e.committee_setup_id = i)) <> 0 THEN
+			IF (SELECT count(*) FROM deposit.transaction_view WHERE customer_id = (SELECT e.member_id FROM core.committee_setup e WHERE e.committee_setup_id = i))> 0
+			THEN
+				update t_ set is_regular_deposit = true WHERE t_.member_id = (SELECT s.member_id FROM core.committee_setup s WHERE s.committee_setup_id = i);
+			ELSE
+				update t_ set is_regular_deposit = false WHERE t_.member_id = (SELECT s.member_id FROM core.committee_setup s WHERE s.committee_setup_id = i);
+			END IF;
+		END IF;
+		
+		IF (SELECT t_.loan_ac FROM t_ WHERE t_.member_id = (SELECT s.member_id FROM core.committee_setup s WHERE s.committee_setup_id = i)) <> 0 THEN
+			IF (SELECT COUNT(*) FROM loan.transaction_view WHERE customer_id = (SELECT e.member_id FROM core.committee_setup e WHERE e.committee_setup_id = i)) > 0
+			THEN
+				UPDATE t_ SET loan_payment = true WHERE t_.member_id = (SELECT s.member_id FROM core.committee_setup s WHERE s.committee_setup_id = i);
+			ELSE
+				UPDATE t_ SET loan_payment = false WHERE t_.member_id = (SELECT s.member_id FROM core.committee_setup s WHERE s.committee_setup_id = i);
+			END IF;
+		END IF;
+		
+		i := i + 1;
+		EXIT WHEN i > (SELECT MAX(committee_setup_id) FROM core.committee_setup);
+	END LOOP;
+		
+	RETURN QUERY(SELECT * FROM t_);
+END
+$BODY$;
+
+ALTER FUNCTION core.get_dosari_report(integer, date, date)
+    OWNER TO postgres;

@@ -1,0 +1,82 @@
+-- FUNCTION: core.insert_into_share_dividend_posting(integer, date, date, numeric, numeric)
+
+-- DROP FUNCTION IF EXISTS core.insert_into_share_dividend_posting(integer, date, date, numeric, numeric);
+
+CREATE OR REPLACE FUNCTION core.insert_into_share_dividend_posting(
+	office_id_ integer,
+	from_ date,
+	to_ date,
+	rate_ numeric,
+	tax_ numeric)
+    RETURNS TABLE(office_id integer, customer_id bigint, share_account_id bigint, share_no character varying, share_product character varying, account_no character varying, posting_ac_product character varying, posting_ac_id bigint, posting_ac_product_gl integer, customer_name character varying, address character varying, days integer, debit money, credit money, balance money, dividend money, tax money, net money, share_post money, saving_post money) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+	declare i int = 0;
+	
+    BEGIN
+        DELETE FROM core.share_dividend_posting p WHERE p.office_id IN (1,2,3,4,5,6);
+
+        INSERT INTO core.share_dividend_posting(office_id, customer_id, share_account_id, share_no, share_product, account_no, posting_ac_product, posting_ac_id, posting_ac_product_gl, customer_name, address, days, debit, credit, balance, dividend, tax, net, share_post, saving_post) 
+        SELECT t.office_id,
+            t.customer_id,
+            t.share_account_id,
+            t.share_no,
+            p.share_product_name,
+            t.account_no,
+            '',
+            0,
+            0,
+            t.customer_name,
+            t.address,
+            t.days,
+            t.debit,
+            t.credit,
+            t.balance,
+            t.dividend,
+            t.tax,
+            t.net,
+            '',
+            '' 
+        FROM core.totalsharedividendcalculation($1, $2, $3, $4, $5) t
+        INNER JOIN core.share_accounts s
+            ON t.share_no = s.account_number
+        INNER JOIN core.share_products p
+            ON s.share_product_id = p.share_product_id;
+            
+        DELETE FROM core.share_dividend_posting d WHERE d.net::numeric = 0;
+        
+        UPDATE core.share_dividend_posting SET saving_post = (SELECT core.share_dividend_posting.net::numeric % 100 as exceed);
+        UPDATE core.share_dividend_posting d SET share_post = d.net - d.saving_post;
+        
+		LOOP
+			i := i + 1;
+			EXIT WHEN i > (SELECT COUNT(order_id) FROM core.share_dividend_posting_product_order)::integer;
+		
+			UPDATE core.share_dividend_posting SET account_no=a.account_number, posting_ac_product=(SELECT product_name FROM core.share_dividend_posting_product_order WHERE order_id = i)
+			FROM deposit.account_holders a
+			where core.share_dividend_posting.customer_id= a.customer_id
+			and a.deposit_product_id=(SELECT deposit_product_id FROM core.share_dividend_posting_product_order WHERE order_id = i)
+			and a.status=true
+			and core.share_dividend_posting.account_no isnull;	
+    	END LOOP;
+		
+		UPDATE core.share_dividend_posting SET posting_ac_id = a.account_number_id 
+		FROM deposit.account_holders a
+		WHERE core.share_dividend_posting.account_no= a.account_number;
+			
+		UPDATE core.share_dividend_posting SET posting_ac_product_gl = d.gl_account_id 
+		FROM core.deposit_products d
+		join core.share_dividend_posting_product_order on d.deposit_product_id = share_dividend_posting_product_order.deposit_product_id
+		where share_dividend_posting.posting_ac_product = share_dividend_posting_product_order.product_name  ;
+			
+        RETURN QUERY (SELECT * FROM core.share_dividend_posting ORDER BY customer_id);
+        
+    END
+$BODY$;
+
+ALTER FUNCTION core.insert_into_share_dividend_posting(integer, date, date, numeric, numeric)
+    OWNER TO postgres;

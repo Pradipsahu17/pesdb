@@ -1,0 +1,761 @@
+CREATE TABLE IF NOT EXISTS core.municipality(
+	municipality_id serial PRIMARY KEY NOT NULL,
+	province_id integer REFERENCES core.province_name(province_id) NOT NULL,
+	district_id integer REFERENCES core.district_name(district_id) NOT NULL,
+	municipality_name character varying NOT NULL,
+	municipality_name_np character varying);
+
+insert into core.municipality(province_id, district_id, municipality_name)
+select 1,12,'Sidingba Rural Municipality' union all
+select 1,12,'Meringden Rural Municipality' union all
+select 1,12,'Maiwakhola Rural Municipality' union all
+select 1,12,'Phaktanglung Rural Municipality' union all
+select 1,12,'Sirijangha Rural Municipality' union all
+select 1,12,'Mikwakhola Rural Municipality' union all
+select 1,12,'Aathrai Tribeni Rural Municipality' union all
+select 1,12,'Pathivara Yangwarak Rural Municipality' union all
+select 1,12,'Phungling Municipality' union all
+select 1,9,'Makalu Rural Municipality' union all
+select 1,9,'Chichila Rural Municipality' union all
+select 1,9,'Silichong Rural Municipality' union all
+select 1,9,'Bhotkhola Rural Municipality' union all
+select 1,9,'Sabhapokhari Rural Municipality' union all
+select 1,9,'Dharmadevi Municipality' union all
+select 1,9,'Madi Municipality' union all
+select 1,9,'Panchakhapan Municipality' union all
+select 1,9,'Chainpur Municipality' union all
+select 1,9,'Khandbari Municipality' union all
+select 1,10,'Sotang Rural Municipality' union all
+select 1,10,'Mahakulung Rural Municipality' union all
+select 1,10,'Likhupike Rural Municipality' union all
+select 1,10,'Nechasalyan Rural Municipality' union all
+select 1,10,'Thulung Dudhkoshi Rural Municipality' union all
+select 1,10,'Maapya Dudhkoshi Rural Municipality' union all
+select 1,10,'Khumbupasanglahmu Rural Municipality' union all
+select 1,10,'Solududhakunda Municipality' union all
+select 1,7,'Likhu Rural Municipality' union all
+select 1,7,'Molung Rural Municipality' union all
+select 1,7,'Sunkoshi Rural Municipality' union all
+select 1,7,'Champadevi Rural Municipality' union all
+select 1,7,'Chisankhugadhi Rural Municipality' union all
+select 1,7,'Khijidemba Rural Municipality' union all
+select 1,7,'Manebhanjyang Rural Municipality' union all
+select 1,7,'Siddhicharan Municipality' union all
+select 1,5,'Sakela Rural Municipality' union all
+select 1,5,'Khotehang Rural Municipality' union all
+select 1,5,'Barahapokhari Rural Municipality' union all
+select 1,5,'Ainselukhark Rural Municipality' union all
+select 1,5,'Rawa Besi Rural Municipality' union all
+select 1,5,'Kepilasagadhi Rural Municipality' union all
+select 1,5,'Jantedhunga Rural Municipality' union all
+select 1,5,'Diprung Chuichumma Rural Municipality' union all
+select 1,5,'Halesi Tuwachung Municipality' union all
+select 1,5,'Diktel Rupakot Majhuwagadhi Municipality' union all
+select 1,1,'Arun Rural Municipality' union all
+select 1,1,'Aamchowk Rural Municipality' union all
+select 1,1,'Hatuwagadhi Rural Municipality' union all
+select 1,1,'Pauwadungma Rural Municipality' union all
+select 1,1,'Temkemaiyung Rural Municipality' union all
+select 1,1,'Salpasilichho Rural Municipality' union all
+select 1,1,'Ramprasad Rai Rural Municipality' union all
+select 1,1,'Shadananda Municipality' union all
+select 1,1,'Bhojpur Municipality' union all
+select 1,2,'Chaubise Rural Municipality' union all
+select 1,2,'Shahidbhumi Rural Municipality' union all
+select 1,2,'Sangurigadhi Rural Municipality' union all
+select 1,2,'Chhathar Jorpati Rural Municipality' union all
+select 1,2,'Pakhribas Municipality' union all
+select 1,2,'Mahalaxmi Municipality' union all
+select 1,2,'Dhankuta Municipality' union all
+select 1,13,'Chhathar Rural Municipality' union all
+select 1,13,'Phedap Rural Municipality' union all
+select 1,13,'Aathrai Rural Municipality' union all
+select 1,13,'Menchayam Rural Municipality' union all
+select 1,13,'Laligurans Municipality' union all
+select 1,13,'Myanglung Municipality' union all
+select 1,8,'Yangwarak Rural Municipality' union all
+select 1,8,'Hilihang Rural Municipality' union all
+select 1,8,'Falelung Rural Municipality' union all
+select 1,8,'Tumbewa Rural Municipality' union all
+select 1,8,'Kummayak Rural Municipality' union all
+select 1,8,'Miklajung Rural Municipality' union all
+select 1,8,'Falgunanda Rural Municipality' union all
+select 1,8,'Phidim Municipality' union all
+select 1,3,'Rong Rural Municipality' union all
+select 1,3,'Mangsebung Rural Municipality' union all
+select 1,3,'Chulachuli Rural Municipality' union all
+select 1,3,'Sandakpur Rural Municipality' union all
+select 1,3,'Fakphokthum Rural Municipality' union all
+select 1,3,'Maijogmai Rural Municipality' union all
+select 1,3,'Illam Municipality' union all
+select 1,3,'Mai Municipality' union all
+select 1,3,'Deumai Municipality' union all
+select 1,3,'Suryodaya Municipality' union all
+select 1,4,'Kamal Rural Municipality' union all
+select 1,4,'Jhapa Rural Municipality' union all
+select 1,4,'Kachankawal Rural Municipality' union all
+select 1,4,'Gauriganj Rural Municipality' union all
+select 1,4,'Barhadashi Rural Municipality' union all
+select 1,4,'Haldibari Rural Municipality' union all
+select 1,4,'Buddhashanti Rural Municipality' union all
+select 1,4,'Shivasataxi Municipality' union all
+select 1,4,'Bhadrapur Municipality' union all
+select 1,4,'Kankai Municipality' union all
+select 1,4,'Birtamod Municipality' union all
+select 1,4,'Mechinagar Municipality' union all
+select 1,4,'Damak Municipality' union all
+select 1,4,'Arjundhara Municipality' union all
+select 1,4,'Gauradhaha Municipality' union all
+select 1,3,'Jahada Rural Municipality' union all
+select 1,3,'Katahari Rural Municipality' union all
+select 1,3,'Gramthan Rural Municipality' union all
+select 1,3,'Dhanpalthan Rural Municipality' union all
+select 1,3,'Kerabari Rural Municipality' union all
+select 1,3,'Budhiganga Rural Municipality' union all
+select 1,3,'Kanepokhari Rural Municipality' union all
+select 1,3,'Miklajung Rural Municipality' union all
+select 1,3,'Letang Municipality' union all
+select 1,3,'Sunwarshi Municipality' union all
+select 1,3,'Rangeli Municipality' union all
+select 1,3,'Patahrishanishchare Municipality' union all
+select 1,3,'Biratnagar Metropolitian City' union all
+select 1,3,'Uralabari Municipality' union all
+select 1,3,'Belbari Municipality' union all
+select 1,3,'Sundarharaicha Municipality' union all
+select 1,3,'Ratuwamai Municipality' union all
+select 1,11,'Gadhi Rural Municipality' union all
+select 1,11,'Koshi Rural Municipality' union all
+select 1,11,'Barju Rural Municipality' union all
+select 1,11,'Harinagar Rural Municipality' union all
+select 1,11,'Dewanganj Rural Municipality' union all
+select 1,11,'Bhokraha Narsing Rural Municipality' union all
+select 1,11,'Ramdhuni Municipality' union all
+select 1,11,'Barahchhetra Municipality' union all
+select 1,11,'Duhabi Municipality' union all
+select 1,11,'Inaruwa Municipality' union all
+select 1,11,'Dharan Sub-Metropolitian City' union all
+select 1,11,'Itahari Sub-Metropolitian City' union all
+select 1,14,'Tapli Rural Municipality' union all
+select 1,14,'Rautamai Rural Municipality' union all
+select 1,14,'Udayapurgadhi Rural Municipality' union all
+select 1,14,'Limchungbung Rural Municipality' union all
+select 1,14,'Chaudandigadhi Municipality' union all
+select 1,14,'Triyuga Municipality' union all
+select 1,14,'Katari Municipality' union all
+select 1,14,'Belaka Municipality' union all
+select 2,20,'Rajgadh Rural Municipality' union all
+select 2,20,'Rupani Rural Municipality' union all
+select 2,20,'Tirahut Rural Municipality' union all
+select 2,20,'Mahadeva Rural Municipality' union all
+select 2,20,'Bishnupur Rural Municipality' union all
+select 2,20,'Chhinnamasta Rural Municipality' union all
+select 2,20,'Balan Bihul Rural Municipality' union all
+select 2,20,'Tilathi Koiladi Rural Municipality' union all
+select 2,20,'Agnisair Krishna Savaran Rural Municipality' union all
+select 2,20,'Hanumannagar Kankalini Municipality' union all
+select 2,20,'Kanchanrup Municipality' union all
+select 2,20,'Rajbiraj Municipality' union all
+select 2,20,'Khadak Municipality' union all
+select 2,20,'Dakneshwori Municipality' union all
+select 2,20,'Saptakoshi Rural Municipality' union all
+select 2,20,'Surunga Municipality' union all
+select 2,20,'Shambhunath Municipality' union all
+select 2,20,'Bode Barsain Municipality' union all
+select 2,22,'Aurahi Rural Municipality' union all
+select 2,22,'Naraha Rural Municipality' union all
+select 2,22,'Arnama Rural Municipality' union all
+select 2,22,'Bhagawanpur Rural Municipality' union all
+select 2,22,'Nawarajpur Rural Municipality' union all
+select 2,22,'Bishnupur Rural Municipality' union all
+select 2,22,'Bariyarpatti Rural Municipality' union all
+select 2,22,'Laxmipur Patari Rural Municipality' union all
+select 2,22,'Sakhuwanankarkatti Rural Municipality' union all
+select 2,22,'Mirchaiya Municipality' union all
+select 2,22,'Lahan Municipality' union all
+select 2,22,'Siraha Municipality' union all
+select 2,22,'Dhangadhimai Municipality' union all
+select 2,22,'Kalyanpur Municipality' union all
+select 2,22,'Karjanha Municipality' union all
+select 2,22,'Golbazar Municipality' union all
+select 2,22,'Sukhipur Municipality' union all
+select 2,16,'Aaurahi Rural Municipality' union all
+select 2,16,'Dhanauji Rural Municipality' union all
+select 2,16,'Bateshwor Rural Municipality' union all
+select 2,16,'Janaknandani Rural Municipality' union all
+select 2,16,'Lakshminiya Rural Municipality' union all
+select 2,16,'Mukhiyapatti Musarmiya Rural Municipality' union all
+select 2,16,'Mithila Bihari Municipality' union all
+select 2,16,'Kamala Municipality' union all
+select 2,16,'Nagarain Municipality' union all
+select 2,16,'Ganeshman Charnath Municipality' union all
+select 2,16,'Mithila Municipality' union all
+select 2,16,'Dhanusadham Municipality' union all
+select 2,16,'Bideha Municipality' union all
+select 2,16,'Sabaila Municipality' union all
+select 2,16,'Hansapur Municipality' union all
+select 2,16,'Janakpurdham Sub-Metropolitian City' union all
+select 2,16,'Sahidnagar Municipality' union all
+select 2,16,'Chhireshwornath Municipality' union all
+select 2,17,'Pipra Rural Municipality' union all
+select 2,17,'Sonama Rural Municipality' union all
+select 2,17,'Samsi Rural Municipality' union all
+select 2,17,'Ekdanra Rural Municipality' union all
+select 2,17,'Mahottari Rural Municipality' union all
+select 2,17,'Gaushala Municipality' union all
+select 2,17,'Ramgopalpur Municipality' union all
+select 2,17,'Aurahi Municipality' union all
+select 2,17,'Bardibas Municipality' union all
+select 2,17,'Bhangaha Municipality' union all
+select 2,17,'Jaleswor Municipality' union all
+select 2,17,'Balwa Municipality' union all
+select 2,17,'Manra Siswa Municipality' union all
+select 2,17,'Matihani Municipality' union all
+select 2,17,'Loharpatti Municipality' union all
+select 2,21,'Dhankaul Rural Municipality' union all
+select 2,21,'Parsa Rural Municipality' union all
+select 2,21,'Bishnu Rural Municipality' union all
+select 2,21,'Ramnagar Rural Municipality' union all
+select 2,21,'Kaudena Rural Municipality' union all
+select 2,21,'Basbariya Rural Municipality' union all
+select 2,21,'Chandranagar Rural Municipality' union all
+select 2,21,'Chakraghatta Rural Municipality' union all
+select 2,21,'Bramhapuri Rural Municipality' union all
+select 2,21,'Barahathawa Municipality' union all
+select 2,21,'Haripur Municipality' union all
+select 2,21,'Ishworpur Municipality' union all
+select 2,21,'Lalbandi Municipality' union all
+select 2,21,'Malangawa Municipality' union all
+select 2,21,'Kabilasi Municipality' union all
+select 2,21,'Bagmati Municipality' union all
+select 2,21,'Hariwan Municipality' union all
+select 2,21,'Balara Municipality' union all
+select 2,21,'Haripurwa Municipality' union all
+select 2,21,'Godaita Municipality' union all
+select 2,19,'Yemunamai Rural Municipality' union all
+select 2,19,'Durga Bhagwati Rural Municipality' union all
+select 2,19,'Katahariya Municipality' union all
+select 2,19,'Maulapur Municipality' union all
+select 2,19,'Madhav Narayan Municipality' union all
+select 2,19,'Gaur Municipality' union all
+select 2,19,'Gujara Municipality' union all
+select 2,19,'Garuda Municipality' union all
+select 2,19,'Ishanath Municipality' union all
+select 2,19,'Chandrapur Municipality' union all
+select 2,19,'Dewahhi Gonahi Municipality' union all
+select 2,19,'Brindaban Municipality' union all
+select 2,19,'Rajpur Municipality' union all
+select 2,19,'Rajdevi Municipality' union all
+select 2,19,'Gadhimai Municipality' union all
+select 2,19,'Phatuwa Bijayapur Municipality' union all
+select 2,19,'Baudhimai Municipality' union all
+select 2,19,'Paroha Municipality' union all
+select 2,15,'Pheta Rural Municipality' union all
+select 2,15,'Devtal Rural Municipality' union all
+select 2,15,'Prasauni Rural Municipality' union all
+select 2,15,'Suwarna Rural Municipality' union all
+select 2,15,'Baragadhi Rural Municipality' union all
+select 2,15,'Karaiyamai Rural Municipality' union all
+select 2,15,'Parwanipur Rural Municipality' union all
+select 2,15,'Bishrampur Rural Municipality' union all
+select 2,15,'Adarshkotwal Rural Municipality' union all
+select 2,15,'Jitpur Simara Sub-Metropolitian City' union all
+select 2,15,'Kalaiya Sub-Metropolitian City' union all
+select 2,15,'Pacharauta Municipality' union all
+select 2,15,'Nijgadh Municipality' union all
+select 2,15,'Simraungadh Municipality' union all
+select 2,15,'Mahagadhimai Municipality' union all
+select 2,15,'Kolhabi Municipality' union all
+select 2,18,'Thori Rural Municipality' union all
+select 2,18,'Dhobini Rural Municipality' union all
+select 2,18,'Chhipaharmai Rural Municipality' union all
+select 2,18,'Jirabhawani Rural Municipality' union all
+select 2,18,'Jagarnathpur Rural Municipality' union all
+select 2,18,'Kalikamai Rural Municipality' union all
+select 2,18,'Bindabasini Rural Municipality' union all
+select 2,18,'Pakahamainpur Rural Municipality' union all
+select 2,18,'SakhuwaPrasauni Rural Municipality' union all
+select 2,18,'Paterwasugauli Rural Municipality' union all
+select 2,18,'Birgunj Metropolitian City' union all
+select 2,18,'Bahudaramai Municipality' union all
+select 2,18,'Pokhariya Municipality' union all
+select 2,18,'Parsagadhi Municipality' union all
+select 3,26,'Bigu Rural Municipality' union all
+select 3,26,'Sailung Rural Municipality' union all
+select 3,26,'Melung Rural Municipality' union all
+select 3,26,'Baiteshwor Rural Municipality' union all
+select 3,26,'Tamakoshi Rural Municipality' union all
+select 3,26,'Gaurishankar Rural Municipality' union all
+select 3,26,'Kalinchok Rural Municipality' union all
+select 3,26,'Jiri Municipality' union all
+select 3,26,'Bhimeshwor Municipality' union all
+select 3,35,'Jugal Rural Municipality' union all
+select 3,35,'Balefi Rural Municipality' union all
+select 3,35,'Sunkoshi Rural Municipality' union all
+select 3,35,'Helambu Rural Municipality' union all
+select 3,35,'Bhotekoshi Rural Municipality' union all
+select 3,35,'Lisangkhu Pakhar Rural Municipality' union all
+select 3,35,'Indrawati Rural Municipality' union all
+select 3,35,'Tripurasundari Rural Municipality' union all
+select 3,35,'Panchpokhari Thangpal Rural Municipality' union all
+select 3,35,'Chautara SangachokGadhi Municipality' union all
+select 3,35,'Barhabise Municipality' union all
+select 3,35,'Melamchi Municipality' union all
+select 3,33,'Kalika Rural Municipality' union all
+select 3,33,'Naukunda Rural Municipality' union all
+select 3,33,'Uttargaya Rural Municipality' union all
+select 3,33,'Gosaikunda Rural Municipality' union all
+select 3,33,'Amachodingmo Rural Municipality' union all
+select 3,25,'Gajuri Rural Municipality' union all
+select 3,25,'Galchi Rural Municipality' union all
+select 3,25,'Thakre Rural Municipality' union all
+select 3,25,'Siddhalek Rural Municipality' union all
+select 3,25,'Khaniyabash Rural Municipality' union all
+select 3,25,'Jwalamukhi Rural Municipality' union all
+select 3,25,'Gangajamuna Rural Municipality' union all
+select 3,25,'Rubi Valley Rural Municipality' union all
+select 3,25,'Tripura Sundari Rural Municipality' union all
+select 3,25,'Netrawati Dabjong Rural Municipality' union all
+select 3,25,'Benighat Rorang Rural Municipality' union all
+select 3,25,'Nilakantha Municipality' union all
+select 3,25,'Dhunibesi Municipality' union all
+select 3,31,'Kakani Rural Municipality' union all
+select 3,31,'Tadi Rural Municipality' union all
+select 3,31,'Likhu Rural Municipality' union all
+select 3,31,'Myagang Rural Municipality' union all
+select 3,31,'Shivapuri Rural Municipality' union all
+select 3,31,'Kispang Rural Municipality' union all
+select 3,31,'Suryagadhi Rural Municipality' union all
+select 3,31,'Tarkeshwar Rural Municipality' union all
+select 3,31,'Panchakanya Rural Municipality' union all
+select 3,31,'Dupcheshwar Rural Municipality' union all
+select 3,31,'Belkotgadhi Municipality' union all
+select 3,31,'Bidur Municipality' union all
+select 3,27,'Kirtipur Municipality' union all
+select 3,27,'Shankharapur Municipality' union all
+select 3,27,'Nagarjun Municipality' union all
+select 3,27,'Kageshwori Manahora Municipality' union all
+select 3,27,'Dakshinkali Municipality' union all
+select 3,27,'Budhanilakantha Municipality' union all
+select 3,27,'Tarakeshwor Municipality' union all
+select 3,27,'Kathmandu Metropolitian City' union all
+select 3,27,'Tokha Municipality' union all
+select 3,27,'Chandragiri Municipality' union all
+select 3,27,'Gokarneshwor Municipality' union all
+select 3,23,'Changunarayan Municipality' union all
+select 3,23,'Suryabinayak Municipality' union all
+select 3,23,'Bhaktapur Municipality' union all
+select 3,23,'Madhyapur Thimi Municipality' union all
+select 3,29,'Bagmati Rural Municipality' union all
+select 3,29,'Mahankal Rural Municipality' union all
+select 3,29,'Konjyosom Rural Municipality' union all
+select 3,29,'Lalitpur Metropolitian City' union all
+select 3,29,'Mahalaxmi Municipality' union all
+select 3,29,'Godawari Municipality' union all
+select 3,28,'Roshi Rural Municipality' union all
+select 3,28,'Temal Rural Municipality' union all
+select 3,28,'Bhumlu Rural Municipality' union all
+select 3,28,'Mahabharat Rural Municipality' union all
+select 3,28,'Bethanchowk Rural Municipality' union all
+select 3,28,'Khanikhola Rural Municipality' union all
+select 3,28,'Chaurideurali Rural Municipality' union all
+select 3,28,'Banepa Municipality' union all
+select 3,28,'Mandandeupur Municipality' union all
+select 3,28,'Dhulikhel Municipality' union all
+select 3,28,'Panauti Municipality' union all
+select 3,28,'Namobuddha Municipality' union all
+select 3,28,'Panchkhal Municipality' union all
+select 3,32,'Sunapati Rural Municipality' union all
+select 3,32,'Doramba Rural Municipality' union all
+select 3,32,'Umakunda Rural Municipality' union all
+select 3,32,'Khadadevi Rural Municipality' union all
+select 3,32,'Gokulganga Rural Municipality' union all
+select 3,32,'Likhu Tamakoshi Rural Municipality' union all
+select 3,32,'Manthali Municipality' union all
+select 3,32,'Ramechhap Municipality' union all
+select 3,34,'Marin Rural Municipality' union all
+select 3,34,'Phikkal Rural Municipality' union all
+select 3,34,'Tinpatan Rural Municipality' union all
+select 3,34,'Sunkoshi Rural Municipality' union all
+select 3,34,'Golanjor Rural Municipality' union all
+select 3,34,'Ghanglekh Rural Municipality' union all
+select 3,34,'Hariharpurgadhi Rural Municipality' union all
+select 3,34,'Dudhouli Municipality' union all
+select 3,34,'Kamalamai Municipality' union all
+select 3,30,'Bakaiya Rural Municipality' union all
+select 3,30,'Kailash Rural Municipality' union all
+select 3,30,'Manahari Rural Municipality' union all
+select 3,30,'Bhimphedi Rural Municipality' union all
+select 3,30,'Bagmati Rural Municipality' union all
+select 3,30,'Raksirang Rural Municipality' union all
+select 3,30,'Makawanpurgadhi Rural Municipality' union all
+select 3,30,'Indrasarowar Rural Municipality' union all
+select 3,30,'Hetauda Sub-Metropolitian City' union all
+select 3,30,'Thaha Municipality' union all
+select 3,24,'Ichchhyakamana Rural Municipality' union all
+select 3,24,'Bharatpur Metropolitian City' union all
+select 3,24,'Kalika Municipality' union all
+select 3,24,'Khairahani Municipality' union all
+select 3,24,'Madi Municipality' union all
+select 3,24,'Rapti Municipality' union all
+select 3,24,'Ratnanagar Municipality' union all
+select 4,37,'Gandaki Rural Municipality' union all
+select 4,37,'Dharche Rural Municipality' union all
+select 4,37,'Aarughat Rural Municipality' union all
+select 4,37,'Ajirkot Rural Municipality' union all
+select 4,37,'Sahid Lakhan Rural Municipality' union all
+select 4,37,'Siranchok Rural Municipality' union all
+select 4,37,'Bhimsenthapa Rural Municipality' union all
+select 4,37,'Chum Nubri Rural Municipality' union all
+select 4,37,'Barpak Sulikot Rural Municipality' union all
+select 4,37,'Palungtar Municipality' union all
+select 4,37,'Gorkha Municipality' union all
+select 4,40,'Chame Rural Municipality' union all
+select 4,40,'Narshon Rural Municipality' union all
+select 4,40,'Narpa Bhumi Rural Municipality' union all
+select 4,40,'Manang Ingshyang Rural Municipality' union all
+select 4,41,'Thasang Rural Municipality' union all
+select 4,41,'Gharapjhong Rural Municipality' union all
+select 4,41,'Lomanthang Rural Municipality' union all
+select 4,41,'Lo-Ghekar Damodarkunda Rural Municipality' union all
+select 4,41,'Waragung Muktikhsetra Rural Municipality' union all
+select 4,42,'Mangala Rural Municipality' union all
+select 4,42,'Malika Rural Municipality' union all
+select 4,42,'Raghuganga Rural Municipality' union all
+select 4,42,'Dhaulagiri Rural Municipality' union all
+select 4,42,'Annapurna Rural Municipality' union all
+select 4,42,'Beni Municipality' union all
+select 4,38,'Rupa Rural Municipality' union all
+select 4,38,'Madi Rural Municipality' union all
+select 4,38,'Annapurna Rural Municipality' union all
+select 4,38,'Machhapuchchhre Rural Municipality' union all
+select 4,38,'Pokhara Metropolitian City' union all
+select 4,39,'Dordi Rural Municipality' union all
+select 4,39,'Dudhpokhari Rural Municipality' union all
+select 4,39,'Marsyangdi Rural Municipality' union all
+select 4,39,'Kwholasothar Rural Municipality' union all
+select 4,39,'Sundarbazar Municipality' union all
+select 4,39,'Besishahar Municipality' union all
+select 4,39,'Rainas Municipality' union all
+select 4,39,'MadhyaNepal Municipality' union all
+select 4,46,'Ghiring Rural Municipality' union all
+select 4,46,'Devghat Rural Municipality' union all
+select 4,46,'Rhishing Rural Municipality' union all
+select 4,46,'Myagde Rural Municipality' union all
+select 4,46,'Bandipur Rural Municipality' union all
+select 4,46,'Anbukhaireni Rural Municipality' union all
+select 4,46,'Byas Municipality' union all
+select 4,46,'Shuklagandaki Municipality' union all
+select 4,46,'Bhimad Municipality' union all
+select 4,46,'Bhanu Municipality' union all
+select 4,43,'Baudeekali Rural Municipality' union all
+select 4,43,'Bulingtar Rural Municipality' union all
+select 4,43,'Hupsekot Rural Municipality' union all
+select 4,43,'Binayee Tribeni Rural Municipality' union all
+select 4,43,'Madhyabindu Municipality' union all
+select 4,43,'Devchuli Municipality' union all
+select 4,43,'Gaidakot Municipality' union all
+select 4,43,'Kawasoti Municipality' union all
+select 4,45,'Harinas Rural Municipality' union all
+select 4,45,'Biruwa Rural Municipality' union all
+select 4,45,'Aandhikhola Rural Municipality' union all
+select 4,45,'Phedikhola Rural Municipality' union all
+select 4,45,'Kaligandagi Rural Municipality' union all
+select 4,45,'Arjunchaupari Rural Municipality' union all
+select 4,45,'Putalibazar Municipality' union all
+select 4,45,'Bhirkot Municipality' union all
+select 4,45,'Galyang Municipality' union all
+select 4,45,'Chapakot Municipality' union all
+select 4,45,'Waling Municipality' union all
+select 4,44,'Modi Rural Municipality' union all
+select 4,44,'Painyu Rural Municipality' union all
+select 4,44,'Jaljala Rural Municipality' union all
+select 4,44,'Bihadi Rural Municipality' union all
+select 4,44,'Mahashila Rural Municipality' union all
+select 4,44,'Kushma Municipality' union all
+select 4,44,'Phalebas Municipality' union all
+select 4,36,'Bareng Rural Municipality' union all
+select 4,36,'Badigad Rural Municipality' union all
+select 4,36,'Nisikhola Rural Municipality' union all
+select 4,36,'Kanthekhola Rural Municipality' union all
+select 4,36,'Tara Khola Rural Municipality' union all
+select 4,36,'Taman Khola Rural Municipality' union all
+select 4,36,'Jaimuni Municipality' union all
+select 4,36,'Baglung Municipality' union all
+select 4,36,'Galkot Municipality' union all
+select 4,36,'Dhorpatan Municipality' union all
+select 5,57,'Bhume Rural Municipality' union all
+select 5,57,'Sisne Rural Municipality' union all
+select 5,57,'Putha Uttarganga Rural Municipality' union all
+select 5,56,'Madi Rural Municipality' union all
+select 5,56,'Thawang Rural Municipality' union all
+select 5,56,'Sunchhahari Rural Municipality' union all
+select 5,56,'Lungri Rural Municipality' union all
+select 5,56,'Gangadev Rural Municipality' union all
+select 5,56,'Tribeni Rural Municipality' union all
+select 5,56,'Pariwartan Rural Municipality' union all
+select 5,56,'Runtigadi Rural Municipality' union all
+select 5,56,'Sunil Smriti Rural Municipality' union all
+select 5,56,'Rolpa Municipality' union all
+select 5,55,'Ayirabati Rural Municipality' union all
+select 5,55,'Gaumukhi Rural Municipality' union all
+select 5,55,'Jhimruk Rural Municipality' union all
+select 5,55,'Naubahini Rural Municipality' union all
+select 5,55,'Mandavi Rural Municipality' union all
+select 5,55,'Mallarani Rural Municipality' union all
+select 5,55,'Sarumarani Rural Municipality' union all
+select 5,55,'Pyuthan Municipality' union all
+select 5,55,'Sworgadwary Municipality' union all
+select 5,51,'Ruru Rural Municipality' union all
+select 5,51,'Isma Rural Municipality' union all
+select 5,51,'Madane Rural Municipality' union all
+select 5,51,'Malika Rural Municipality' union all
+select 5,51,'Chatrakot Rural Municipality' union all
+select 5,51,'Dhurkot Rural Municipality' union all
+select 5,51,'Satyawati Rural Municipality' union all
+select 5,51,'Chandrakot Rural Municipality' union all
+select 5,51,'Kaligandaki Rural Municipality' union all
+select 5,51,'Gulmidarbar Rural Municipality' union all
+select 5,51,'Resunga Municipality' union all
+select 5,51,'Musikot Municipality' union all
+select 5,47,'Panini Rural Municipality' union all
+select 5,47,'Chhatradev Rural Municipality' union all
+select 5,47,'Malarani Rural Municipality' union all
+select 5,47,'Bhumekasthan Municipality' union all
+select 5,47,'Sitganga Municipality' union all
+select 5,47,'Sandhikharka Municipality' union all
+select 5,54,'Rambha Rural Municipality' union all
+select 5,54,'Tinau Rural Municipality' union all
+select 5,54,'Nisdi Rural Municipality' union all
+select 5,54,'Mathagadhi Rural Municipality' union all
+select 5,54,'Ribdikot Rural Municipality' union all
+select 5,54,'Purbakhola Rural Municipality' union all
+select 5,54,'Bagnaskali Rural Municipality' union all
+select 5,54,'Rainadevi Chhahara Rural Municipality' union all
+select 5,54,'Tansen Municipality' union all
+select 5,54,'Rampur Municipality' union all
+select 5,53,'Sarawal Rural Municipality' union all
+select 5,53,'Susta Rural Municipality' union all
+select 5,53,'Pratappur Rural Municipality' union all
+select 5,53,'Palhi Nandan Rural Municipality' union all
+select 5,53,'Bardaghat Municipality' union all
+select 5,53,'Sunwal Municipality' union all
+select 5,53,'Ramgram Municipality' union all
+select 5,58,'Kanchan Rural Municipality' union all
+select 5,58,'Siyari Rural Municipality' union all
+select 5,58,'Rohini Rural Municipality' union all
+select 5,58,'Gaidahawa Rural Municipality' union all
+select 5,58,'Omsatiya Rural Municipality' union all
+select 5,58,'Sudhdhodhan Rural Municipality' union all
+select 5,58,'Mayadevi Rural Municipality' union all
+select 5,58,'Marchawari Rural Municipality' union all
+select 5,58,'Kotahimai Rural Municipality' union all
+select 5,58,'Sammarimai Rural Municipality' union all
+select 5,58,'Butwal Sub-Metropolitian City' union all
+select 5,58,'Lumbini Sanskritik Municipality' union all
+select 5,58,'Devdaha Municipality' union all
+select 5,58,'Sainamaina Municipality' union all
+select 5,58,'Siddharthanagar Municipality' union all
+select 5,58,'Tillotama Municipality' union all
+select 5,52,'Yashodhara Rural Municipality' union all
+select 5,52,'Bijayanagar Rural Municipality' union all
+select 5,52,'Mayadevi Rural Municipality' union all
+select 5,52,'Suddhodhan Rural Municipality' union all
+select 5,52,'Shivaraj Municipality' union all
+select 5,52,'Kapilbastu Municipality' union all
+select 5,52,'Buddhabhumi Municipality' union all
+select 5,52,'Maharajgunj Municipality' union all
+select 5,52,'Banganga Municipality' union all
+select 5,52,'Krishnanagar Municipality' union all
+select 5,50,'Babai Rural Municipality' union all
+select 5,50,'Gadhawa Rural Municipality' union all
+select 5,50,'Rapti Rural Municipality' union all
+select 5,50,'Rajpur Rural Municipality' union all
+select 5,50,'Dangisharan Rural Municipality' union all
+select 5,50,'Shantinagar Rural Municipality' union all
+select 5,50,'Banglachuli Rural Municipality' union all
+select 5,50,'Tulsipur Sub-Metropolitian City' union all
+select 5,50,'Ghorahi Sub-Metropolitian City' union all
+select 5,50,'Lamahi Municipality' union all
+select 5,48,'Khajura Rural Municipality' union all
+select 5,48,'Janki Rural Municipality' union all
+select 5,48,'Baijanath Rural Municipality' union all
+select 5,48,'Duduwa Rural Municipality' union all
+select 5,48,'Narainapur Rural Municipality' union all
+select 5,48,'Rapti Sonari Rural Municipality' union all
+select 5,48,'Kohalpur Municipality' union all
+select 5,48,'Nepalgunj Sub-Metropolitian City' union all
+select 5,49,'Geruwa Rural Municipality' union all
+select 5,49,'Badhaiyatal Rural Municipality' union all
+select 5,49,'Thakurbaba Municipality' union all
+select 5,49,'Bansagadhi Municipality' union all
+select 5,49,'Barbardiya Municipality' union all
+select 5,49,'Rajapur Municipality' union all
+select 5,49,'Madhuwan Municipality' union all
+select 5,49,'Gulariya Municipality' union all
+select 6,60,'Kaike Rural Municipality' union all
+select 6,60,'Jagadulla Rural Municipality' union all
+select 6,60,'Mudkechula Rural Municipality' union all
+select 6,60,'Dolpo Buddha Rural Municipality' union all
+select 6,60,'Shey Phoksundo Rural Municipality' union all
+select 6,60,'Chharka Tangsong Rural Municipality' union all
+select 6,60,'Tripurasundari Municipality' union all
+select 6,60,'Thuli Bheri Municipality' union all
+select 6,65,'Soru Rural Municipality' union all
+select 6,65,'Khatyad Rural Municipality' union all
+select 6,65,'Mugum Karmarong Rural Municipality' union all
+select 6,65,'Chhayanath Rara Municipality' union all
+select 6,61,'Simkot Rural Municipality' union all
+select 6,61,'Namkha Rural Municipality' union all
+select 6,61,'Chankheli Rural Municipality' union all
+select 6,61,'Tanjakot Rural Municipality' union all
+select 6,61,'Sarkegad Rural Municipality' union all
+select 6,61,'Adanchuli Rural Municipality' union all
+select 6,61,'Kharpunath Rural Municipality' union all
+select 6,63,'Hima Rural Municipality' union all
+select 6,63,'Tila Rural Municipality' union all
+select 6,63,'Sinja Rural Municipality' union all
+select 6,63,'Guthichaur Rural Municipality' union all
+select 6,63,'Tatopani Rural Municipality' union all
+select 6,63,'Patrasi Rural Municipality' union all
+select 6,63,'Kanakasundari Rural Municipality' union all
+select 6,63,'Chandannath Municipality' union all
+select 6,64,'Mahawai Rural Municipality' union all
+select 6,64,'Palata Rural Municipality' union all
+select 6,64,'Naraharinath Rural Municipality' union all
+select 6,64,'Pachaljharana Rural Municipality' union all
+select 6,64,'Subha Kalika Rural Municipality' union all
+select 6,64,'Sanni Tribeni Rural Municipality' union all
+select 6,64,'Khandachakra Municipality' union all
+select 6,64,'Raskot Municipality' union all
+select 6,64,'Tilagufa Municipality' union all
+select 6,59,'Bhairabi Rural Municipality' union all
+select 6,59,'Mahabu Rural Municipality' union all
+select 6,59,'Gurans Rural Municipality' union all
+select 6,59,'Naumule Rural Municipality' union all
+select 6,59,'Bhagawatimai Rural Municipality' union all
+select 6,59,'Thantikandh Rural Municipality' union all
+select 6,59,'Dungeshwor Rural Municipality' union all
+select 6,59,'Aathabis Municipality' union all
+select 6,59,'Dullu Municipality' union all
+select 6,59,'Chamunda Bindrasaini Municipality' union all
+select 6,59,'Narayan Municipality' union all
+select 6,62,'Kuse Rural Municipality' union all
+select 6,62,'Shiwalaya Rural Municipality' union all
+select 6,62,'Barekot Rural Municipality' union all
+select 6,62,'Junichande Rural Municipality' union all
+select 6,62,'Nalagad Municipality' union all
+select 6,62,'Bheri Municipality' union all
+select 6,62,'Chhedagad Municipality' union all
+select 6,66,'Tribeni Rural Municipality' union all
+select 6,66,'Sani Bheri Rural Municipality' union all
+select 6,66,'Banfikot Rural Municipality' union all
+select 6,66,'Aathbiskot Municipality' union all
+select 6,66,'Chaurjahari Municipality' union all
+select 6,66,'Musikot Municipality' union all
+select 6,67,'Kumakh Rural Municipality' union all
+select 6,67,'Darma Rural Municipality' union all
+select 6,67,'Kapurkot Rural Municipality' union all
+select 6,67,'Kalimati Rural Municipality' union all
+select 6,67,'Tribeni Rural Municipality' union all
+select 6,67,'Chhatreshwori Rural Municipality' union all
+select 6,67,'Siddha Kumakh Rural Municipality' union all
+select 6,67,'Sharada Municipality' union all
+select 6,67,'Bangad Kupinde Municipality' union all
+select 6,67,'Bagchaur Municipality' union all
+select 6,68,'Chaukune Rural Municipality' union all
+select 6,68,'Simta Rural Municipality' union all
+select 6,68,'Chingad Rural Municipality' union all
+select 6,68,'Barahtal Rural Municipality' union all
+select 6,68,'Gurbhakot Municipality' union all
+select 6,68,'Panchpuri Municipality' union all
+select 6,68,'Bheriganga Municipality' union all
+select 6,68,'Lekbeshi Municipality' union all
+select 6,68,'Birendranagar Municipality' union all
+select 7,72,'Gaumul Rural Municipality' union all
+select 7,72,'Himali Rural Municipality' union all
+select 7,72,'Jagannath Rural Municipality' union all
+select 7,72,'Khaptad Chhededaha Rural Municipality' union all
+select 7,72,'Swami Kartik Khaapar Rural Municipality' union all
+select 7,72,'Badimalika Municipality' union all
+select 7,72,'Tribeni Municipality' union all
+select 7,72,'Budhiganga Municipality' union all
+select 7,72,'Budhinanda Municipality' union all
+select 7,71,'Masta Rural Municipality' union all
+select 7,71,'Thalara Rural Municipality' union all
+select 7,71,'Talkot Rural Municipality' union all
+select 7,71,'Surma Rural Municipality' union all
+select 7,71,'SaiPaal Rural Municipality' union all
+select 7,71,'Durgathali Rural Municipality' union all
+select 7,71,'Bithadchir Rural Municipality' union all
+select 7,71,'Kedarseu Rural Municipality' union all
+select 7,71,'Khaptadchhanna Rural Municipality' union all
+select 7,71,'Chabispathivera Rural Municipality' union all
+select 7,71,'JayaPrithivi Municipality' union all
+select 7,71,'Bungal Municipality' union all
+select 7,74,'Lekam Rural Municipality' union all
+select 7,74,'Naugad Rural Municipality' union all
+select 7,74,'Byas Rural Municipality' union all
+select 7,74,'Dunhu Rural Municipality' union all
+select 7,74,'Marma Rural Municipality' union all
+select 7,74,'Apihimal Rural Municipality' union all
+select 7,74,'Malikaarjun Rural Municipality' union all
+select 7,74,'Mahakali Municipality' union all
+select 7,74,'Shailyashikhar Municipality' union all
+select 7,70,'Sigas Rural Municipality' union all
+select 7,70,'Shivanath Rural Municipality' union all
+select 7,70,'Surnaya Rural Municipality' union all
+select 7,70,'Dilasaini Rural Municipality' union all
+select 7,70,'Pancheshwar Rural Municipality' union all
+select 7,70,'Dogadakedar Rural Municipality' union all
+select 7,70,'Melauli Municipality' union all
+select 7,70,'Dasharathchanda Municipality' union all
+select 7,70,'Purchaudi Municipality' union all
+select 7,70,'Patan Municipality' union all
+select 7,73,'Alital Rural Municipality' union all
+select 7,73,'Ajaymeru Rural Municipality' union all
+select 7,73,'Bhageshwar Rural Municipality' union all
+select 7,73,'Nawadurga Rural Municipality' union all
+select 7,73,'Ganayapdhura Rural Municipality' union all
+select 7,73,'Amargadhi Municipality' union all
+select 7,73,'Parashuram Municipality' union all
+select 7,75,'Sayal Rural Municipality' union all
+select 7,75,'Adharsha Rural Municipality' union all
+select 7,75,'Jorayal Rural Municipality' union all
+select 7,75,'Badikedar Rural Municipality' union all
+select 7,75,'Purbichauki Rural Municipality' union all
+select 7,75,'K I Singh Rural Municipality' union all
+select 7,75,'Bogtan Foodsil Rural Municipality' union all
+select 7,75,'Dipayal Silgadi Municipality' union all
+select 7,75,'Shikhar Municipality' union all
+select 7,69,'Dhakari Rural Municipality' union all
+select 7,69,'Mellekh Rural Municipality' union all
+select 7,69,'Chaurpati Rural Municipality' union all
+select 7,69,'Ramaroshan Rural Municipality' union all
+select 7,69,'Turmakhad Rural Municipality' union all
+select 7,69,'Bannigadhi Jayagadh Rural Municipality' union all
+select 7,69,'Sanphebagar Municipality' union all
+select 7,69,'Mangalsen Municipality' union all
+select 7,69,'Kamalbazar Municipality' union all
+select 7,69,'Panchadewal Binayak Municipality' union all
+select 7,76,'Chure Rural Municipality' union all
+select 7,76,'Janaki Rural Municipality' union all
+select 7,76,'Kailari Rural Municipality' union all
+select 7,76,'Joshipur Rural Municipality' union all
+select 7,76,'Mohanyal Rural Municipality' union all
+select 7,76,'Bardagoriya Rural Municipality' union all
+select 7,76,'Tikapur Municipality' union all
+select 7,76,'Ghodaghodi Municipality' union all
+select 7,76,'Bhajani Municipality' union all
+select 7,76,'Dhangadhi Sub-Metropolitian City' union all
+select 7,76,'Gauriganga Municipality' union all
+select 7,76,'Godawari Municipality' union all
+select 7,76,'Lamkichuha Municipality' union all
+select 7,77,'Beldandi Rural Municipality' union all
+select 7,77,'Laljhadi Rural Municipality' union all
+select 7,77,'Punarbas Municipality' union all
+select 7,77,'Krishnapur Municipality' union all
+select 7,77,'Mahakali Municipality' union all
+select 7,77,'Bedkot Municipality' union all
+select 7,77,'Belauri Municipality' union all
+select 7,77,'Bhimdatta Municipality' union all
+select 7,77,'Shuklaphanta Municipality';

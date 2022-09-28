@@ -1,0 +1,63 @@
+-- SELECT * FROM bsmart.get_coop_transfer(0,'',51828,'cp1','Out')
+
+-- DROP FUNCTION bsmart.get_coop_transfer(bigint,character varying,bigint,text,character varying) 
+
+CREATE OR REPLACE FUNCTION bsmart.get_coop_transfer(
+	request_id_ bigint,
+	transaction_id_ character varying,
+	partner_transaction_id_ bigint,
+	transfer_type_ text,
+	tran_type_ character varying)
+	RETURNS TABLE(request_id bigint,api_user_id character varying,source_bank character varying,source_account_name character varying,source_accountnumber character varying,source_branch_code character varying,destination_bank character varying,destination_account_name character varying,destination_accountnumber character varying,destination_branch_code character varying,amount money,transaction_id character varying,partner_transaction_id bigint,transfer_type text,tran_type character varying,gateway_name character varying,remarks text,customer_mobile character varying,status boolean,audit_ts character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		CREATE TEMP TABLE _t(request_id bigint,api_user_id character varying,source_bank character varying,source_account_name character varying,source_accountnumber character varying,source_branch_code character varying,destination_bank character varying,destination_account_name character varying,destination_accountnumber character varying,destination_branch_code character varying,amount money,transaction_id character varying,partner_transaction_id bigint,transfer_type text,tran_type character varying,gateway_name character varying,remarks text,customer_mobile character varying,status boolean,audit_ts character varying) ON COMMIT DROP;
+		INSERT INTO _t(request_id, api_user_id, source_bank, source_account_name, source_accountnumber, source_branch_code, destination_bank, destination_account_name, destination_accountnumber, destination_branch_code, amount, transaction_id, partner_transaction_id, transfer_type, tran_type, gateway_name, remarks, customer_mobile, status, audit_ts)
+		SELECT t.request_id,
+			t.api_user_id,
+			t.source_bank,
+			t.source_account_name,
+			t.source_accountnumber,
+			t.source_branch_code,
+			t.destination_bank,
+			t.destination_account_name,
+			t.destination_accountnumber,
+			t.destination_branch_code,
+			t.amount,
+			t.transaction_id,
+			t.partner_transaction_id,
+			t.transfer_type,
+			t.tran_type,
+			t.gateway_name,
+			t.remarks,
+			t.customer_mobile,
+			t.status,
+			core.date_bs_from_ad(t.audit_ts::date)
+		FROM bsmart.coop_transfer t;
+		
+		IF request_id_ <> 0 THEN
+			DELETE FROM _t WHERE _t.request_id <> request_id_;
+		END IF;
+		
+		IF transaction_id_ <> '' THEN
+			DELETE FROM _t WHERE _t.transaction_id <> transaction_id_;
+		END IF;
+		
+		IF partner_transaction_id_ <> 0 THEN
+			DELETE FROM _t WHERE _t.partner_transaction_id <> partner_transaction_id_;
+		END IF;
+		
+		IF transfer_type_ <> '' THEN
+			DELETE FROM _t WHERE _t.transfer_type <> transfer_type_;
+		END IF;
+		
+		IF tran_type_ <> '' THEN
+			DELETE FROM _t WHERE _t.tran_type <> tran_type_;
+		END IF;
+		
+		RETURN QUERY(SELECT * FROM _t);
+	END
+$BODY$;

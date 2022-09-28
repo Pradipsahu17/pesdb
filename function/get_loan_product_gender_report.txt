@@ -1,0 +1,54 @@
+CREATE OR REPLACE FUNCTION loan.get_loan_product_gender_report(
+	)
+	RETURNS TABLE(loan_product_id bigint, loan_product_name character varying, Male bigint, Female bigint, Not_Applicable bigint)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT lg.loan_product_id,
+				p.loan_product_name,
+				m.male,
+				f.female,
+				n.not_applicable
+			FROM loan.loan_grant lg 
+			INNER JOIN loan.loan_products p
+				ON lg.loan_product_id = p.loan_product_id
+			LEFT JOIN
+				(
+					SELECT count(c.gender_name) as male,
+						a.loan_product_id as product_id
+					FROM core.customers_view c 
+					INNER JOIN loan.loan_grant a 
+						ON c.customer_id = a.customer_id 
+					WHERE c.gender_name='Male' 
+					AND a.loan_product_id in (select l.loan_product_id from loan.loan_grant l) group by a.loan_product_id
+				) m ON lg.loan_product_id = m.product_id 
+
+			LEFT JOIN
+				(
+					SELECT count(c.gender_name) as female,
+						a.loan_product_id as product_id
+					FROM core.customers_view c 
+					INNER JOIN loan.loan_grant a 
+						ON c.customer_id = a.customer_id 
+					WHERE c.gender_name='Female' 
+					AND a.loan_product_id in (select l.loan_product_id from loan.loan_grant l) group by a.loan_product_id
+				) f ON lg.loan_product_id = f.product_id 
+
+			LEFT JOIN
+				(
+					SELECT count(c.gender_name) as not_applicable,
+						a.loan_product_id as product_id
+					FROM core.customers_view c 
+					INNER JOIN loan.loan_grant a 
+						ON c.customer_id = a.customer_id 
+					WHERE c.gender_name='Not Applicable' 
+					AND a.loan_product_id in (select l.loan_product_id from loan.loan_grant l) group by a.loan_product_id
+				) n ON lg.loan_product_id = n.product_id 
+
+			GROUP BY lg.loan_product_id, p.loan_product_name, m.male, f.female, n.not_applicable
+		);
+	END
+$BODY$;

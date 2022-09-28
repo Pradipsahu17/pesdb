@@ -1,0 +1,94 @@
+CREATE TABLE IF NOT EXISTS microfinance.meeting_setup
+(
+	meeting_setup_id serial UNIQUE PRIMARY KEY NOT NULL,
+	mf_group_id integer REFERENCES microfinance.microfinance_groups(mf_id) NOT NULL,
+	meeting_date_id integer REFERENCES core.date_conversion(date_id) NOT NULL,
+	meeting_month_id integer NOT NULL,
+	meeting_staffname character varying NOT NULL,
+	reference character varying  NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS mf_id_ix
+ON microfinance.meeting_setup USING btree
+(mf_group_id ASC NULLS LAST);
+
+
+
+
+CREATE TABLE IF NOT EXISTS microfinance.meeting_details
+(
+	meeting_id serial UNIQUE PRIMARY KEY NOT NULL,
+	meeting_setup_id bigint REFERENCES microfinance.meeting_setup (meeting_setup_id) NOT NULL,
+	mf_group_id integer REFERENCES microfinance.microfinance_groups (mf_id) NOT NULL,
+	customer_id bigint REFERENCES core.customers (customer_id) NOT NULL,
+	meeting_date character varying NOT NULL,
+	is_presented boolean NOT NULL,
+	reference character varying NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS meeting_setup_id_ix
+ON microfinance.meeting_details USING btree
+(meeting_setup_id ASC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS mf_id_ix
+ON microfinance.meeting_details USING btree
+(mf_group_id ASC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS customer_id_ix
+ON microfinance.meeting_details USING btree
+(customer_id ASC NULLS LAST);
+
+
+
+
+CREATE OR REPLACE FUNCTION microfinance.insert_meeting_details(
+	data_ json)
+	RETURNS void
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		INSERT INTO microfinance.meeting_details(meeting_id,meeting_setup_id,mf_group_id,customer_id,meeting_date,is_presented,reference)
+		SELECT * FROM json_populate_record(null::microfinance.meeting_details,$1);
+	END
+$BODY$;
+
+
+
+CREATE OR REPLACE FUNCTION microfinance.get_member_details(
+	mf_group_name_ text)
+	RETURNS TABLE(member_id bigint, member_name text,address text,main_group text,mf_groups text)
+	LANGUAGE 'plpgsql'
+	VOLATILE PARALLEL UNSAFE
+	COST 100
+AS $BODY$
+	BEGIN
+		RETURN QUERY
+		(
+			SELECT c.customer_id,
+			c.customer_name,
+			c.permanent_address,
+			c.main_group,
+			c.mf_groups
+			FROM microfinance.customers_view c
+			WHERE c.mf_groups=$1
+		);
+	END
+$BODY$;
+
+
+
+CREATE OR REPLACE VIEW microfinance.meeting_detail_view
+ AS
+	SELECT m.meeting_id,
+	m.customer_id,
+	d.date_in_bs,
+	c.customer_name AS member_name,
+	c.permanent_address AS address,
+	c.main_group,
+	c.mf_groups,
+	m.is_presented
+	FROM microfinance.meeting_details m 
+	INNER JOIN microfinance.customers_view c ON m.customer_id = c.customer_id
+	INNER JOIN core.date_conversion d ON m.meeting_date_id = d.date_id;

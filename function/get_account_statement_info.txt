@@ -1,0 +1,42 @@
+-- FUNCTION: loan.get_account_statement_info(bigint, date)
+
+-- DROP FUNCTION IF EXISTS loan.get_account_statement_info(bigint, date);
+
+CREATE OR REPLACE FUNCTION loan.get_account_statement_info(
+	loan_id_ bigint,
+	till_ date)
+    RETURNS TABLE(account_number character varying, product_name character varying, customer_id bigint, customer_name text, address text, contact text, unit_name character varying, interest_rate numeric, curr_interest money, rem_interest money, fine money, penalty money, accured_interest numeric, sanctioned_amt money, total_disburse money, total_paid_principal money, issue_date date, maturity_date date, loan_duration integer) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+	DECLARE _maturity_date date;
+	DECLARE _inv_date date;
+	
+BEGIN
+	SELECT loan.get_maturity_date(loan_id_) INTO _maturity_date;
+
+	--SELECT issue_date FROM loan.loan_grant WHERE loan_id = loan_id_ INTO _inv_date;
+
+RETURN QUERY(
+	SELECT 
+		l.loan_account_number, p.loan_product_name, l.customer_id, 
+		c.customer_name, c.permanent_address, c.contact_number, c.unit_name,
+		loan.get_interest_rate(loan_id_) int_rate, loan.get_current_interest(loan_id_, till_),
+		loan.get_remaining_interest(loan_id_, till_), loan.get_current_fine(loan_id_, till_), loan.get_current_penalty(loan_id_, till_),
+		(SELECT (select sum(interest) from  deposit.interest_transit) - (select sum(interest) from  deposit.interest_transfer) AS accured_interest),
+		l.sanctioned_amount, loan.get_total_disburse_principal(loan_id_, till_), loan.get_total_paid_principal(loan_id_, till_),
+		l.issue_date::date, _maturity_date::date, (_maturity_date::date - l.issue_date::date)::int
+	FROM loan.loan_grant l
+	INNER JOIN loan.loan_products p ON l.loan_product_id = p.loan_product_id
+	INNER JOIN core.customers_view c ON l.customer_id = c.customer_id
+	WHERE l.loan_id=loan_id_
+);
+END
+$BODY$;
+
+ALTER FUNCTION loan.get_account_statement_info(bigint, date)
+    OWNER TO postgres;

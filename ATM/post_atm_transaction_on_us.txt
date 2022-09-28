@@ -1,0 +1,205 @@
+-- FUNCTION: atm.post_atm_transaction_on_us(character varying, character varying, money, character varying)
+
+-- DROP FUNCTION IF EXISTS atm.post_atm_transaction_on_us(character varying, character varying, money, character varying);
+
+CREATE OR REPLACE FUNCTION atm.post_atm_transaction_on_us(
+	from_acc_ character varying,
+	atmterminal_identification_ character varying,
+	amount_ money,
+	tran_type_ character varying,
+	bin_id_ character varying)
+    RETURNS bigint
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _from_office_id	integer;
+	DECLARE _to_office_id 	integer;
+	DECLARE _tran_id	bigint;
+	DECLARE _rem_tran_id	bigint;
+    DECLARE _ibt_tran_id 	bigint;
+	DECLARE _sys_id		integer;
+	DECLARE _date		date;
+	DECLARE _balance	money;
+	DECLARE _from_ac_id	bigint;
+	DECLARE _to_ac_id	bigint;--receiver
+    DECLARE _local_ibt_pay_gl	bigint;--payable to receiver office from other 
+	DECLARE _rem_rec_gl	bigint;--receivable from sender office by receiver office
+	DECLARE _pending_amt money;
+	DECLARE _atm_gl_id bigint;
+	DECLARE _expenses_gl_id bigint;
+	DECLARE _corporate_office_id int;
+	DECLARE _on_us_sct_fee money;
+	DECLARE _vostro_ac_id bigint;
+	DECLARE _ownership_charge_ac_id bigint;
+	DECLARE _atm_charge_ac_id bigint;
+	DECLARE _atm_annual_charge_ac_id bigint;
+	DECLARE _vostro_account character varying := (SELECT a.account_number FROM atm.atm_account_setup a WHERE a.account_type = 'VOSTRO');
+	DECLARE _ownership_account character varying :=(SELECT a.account_number FROM atm.atm_account_setup a WHERE a.account_type = 'OWNERSHIP');
+	DECLARE _atm_charge_account character varying :=(SELECT a.account_number FROM atm.atm_account_setup a WHERE a.account_type = 'ATM CHARGE');
+	
+BEGIN	
+
+-- SCT VOSTRO A/C 99-58-00000066
+-- SCT OWNERSHIP CHARGE A/C 99-58-00000067
+-- SCT ATM CHARGE A/C 99-58-00000068  Issuer (Cooperative)  and remaining to vostro
+-- ATM ANNUAL CHARGE A/C 99-58-00000069
+
+	--CHANGE SCT ON-US CHARGE IF REQUIRED
+	IF tran_type_= 'on_us' THEN
+		--SELECT '2' INTO _on_us_sct_fee;
+		SELECT a.charge INTO _on_us_sct_fee FROM atm.accepted_bank a WHERE a.bin_id = $5;-- update after new table
+	ELSE
+	END IF;
+	
+	--vostro account
+	SELECT  account_number_id FROM deposit.account_holders WHERE account_number=_vostro_account INTO  _vostro_ac_id; 
+	
+
+	--OWNERSHP CHARGE A/C
+	SELECT  account_number_id FROM deposit.account_holders WHERE account_number=_ownership_account INTO  _ownership_charge_ac_id; 
+	
+	
+	--atm charge a/c for on-us charge
+	SELECT  account_number_id FROM deposit.account_holders WHERE account_number=_atm_charge_account INTO  _atm_charge_ac_id; 
+	
+	
+	--REPLACE Expenses gl name
+-- 	IF tran_type_= 'on_us' THEN
+-- 	SELECT gl_account_id FROM core.gl_accounts WHERE account_name='Other Fuel Expenses' INTO _expenses_gl_id;
+-- 	ELSE 
+-- 	END IF;
+
+	SELECT office_id, account_number_id FROM deposit.account_holders WHERE account_number=from_acc_ INTO _from_office_id, _from_ac_id;
+	
+	--ATM GL ID
+	SELECT gl_account_id FROM atm.atm_booth_setup WHERE atmterminal_identification=atmterminal_identification_ INTO _atm_gl_id;
+	
+	SELECT office_id FROM office.offices WHERE parent_office_id isnull INTO _corporate_office_id;
+
+	SELECT COALESCE(debit, '0') INTO _pending_amt FROM transactions.transactions t 
+	INNER JOIN transactions.transaction_details td ON t.tran_id = td.tran_id
+	WHERE t.verification_status_id = 0
+	AND t.tran_date <=now()::date
+	AND td.account_number_id = _from_ac_id;
+	
+	
+	
+	
+	SELECT sms.get_drawing_power(from_acc_) INTO _balance;
+	
+	SELECT _balance - COALESCE(_pending_amt,'0') INTO _balance;
+	
+	
+
+	IF  _balance  <= amount_ THEN
+		RAISE EXCEPTION 'Not Enough Balance';
+
+		END IF;
+
+	SELECT office.get_sys_user_id() INTO _sys_id;
+	SELECT now()::date INTO _date;
+	
+
+IF _from_office_id = _corporate_office_id THEN
+        INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id
+              )
+        SELECT _from_office_id, _date, _date, 'AtmTran',$3,_sys_id, false, 1,_sys_id,_sys_id;
+		
+		  SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id)
+
+        select _tran_id, deposit.product_gl_account_id($1),_from_ac_id, $3, NULL, 'ATM Withdrawal', _sys_id union all 
+        select _tran_id, _atm_gl_id,NULL, NULL, $3, 'ATM Withdrawal', _sys_id;
+		
+	--Expenses Voucher at corporate office for sct charge
+	IF tran_type_ = 'on_us' THEN
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id, account_number_id,debit, credit, statement_reference, audit_user_id)
+
+        select _tran_id, deposit.product_gl_account_id(_ownership_charge_ac_id), _ownership_charge_ac_id, _on_us_sct_fee, NULL, 'SCT On-Us Charge', _sys_id union all 
+        select _tran_id, deposit.product_gl_account_id(_vostro_ac_id), _vostro_ac_id, NULL, _on_us_sct_fee, 'SCT On-Us Charge', _sys_id;
+		ELSE 
+		END IF;
+		
+		
+		
+
+ELSE
+
+		SELECT local_payable_gl_account_id INTO _local_ibt_pay_gl FROM core.ibt_setup
+        WHERE local_office_id=_corporate_office_id;
+		
+		SELECT local_receivable_gl_account_id INTO _rem_rec_gl FROM core.ibt_setup
+        WHERE local_office_id=_from_office_id;	
+
+		INSERT INTO transactions.ibt_transactions(book_name,local_office_id,audit_user_id)
+        SELECT 'AtmTran',_from_office_id,_sys_id;
+        
+                
+        SELECT CURRVAL('transactions.ibt_transactions_ibt_tran_id_seq') INTO _ibt_tran_id;
+
+            INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id
+              )
+        SELECT _from_office_id, _date, _date, 'AtmTran',$3,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+        SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+		
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id)
+
+        select _tran_id, deposit.product_gl_account_id($1),_from_ac_id, amount_, NULL, 'ATM Withdrawal', _sys_id union all 
+        select _tran_id, _local_ibt_pay_gl,NULL, NULL, amount_, 'ATM Withdrawal', _sys_id;
+		
+		--CORPORATE VOUCHER
+
+      INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id)
+      SELECT _corporate_office_id, _date, _date, 'ATMTran', amount_,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+      SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _rem_tran_id;
+
+			INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id, debit, credit, statement_reference, audit_user_id)
+
+		select _rem_tran_id, _rem_rec_gl,  amount_, NULL, 'ATM Transaction', _sys_id union all 
+		select _rem_tran_id, _atm_gl_id,  NULL, amount_,'ATM Transaction', _sys_id;
+		
+			--Expenses Voucher at corporate office for sct charge
+	IF tran_type_ = 'on_us' THEN
+           INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id, account_number_id,debit, credit, statement_reference, audit_user_id)
+
+        SELECT _rem_tran_id, deposit.product_gl_account_id(_ownership_charge_ac_id), _ownership_charge_ac_id, _on_us_sct_fee, NULL, 'SCT On-Us Charge', _sys_id union all 
+        SELECT _rem_tran_id, deposit.product_gl_account_id(_vostro_ac_id), _vostro_ac_id, NULL, _on_us_sct_fee, 'SCT On-Us Charge', _sys_id;
+				
+		ELSE 
+		END IF;
+		
+        END IF;
+		
+		
+
+	RETURN(SELECT _tran_id);		
+		
+		
+--SELECT * FROM atm.post_atm_transaction_on_us('01-01-00000004', '1234abcd', '5000', 'on_us')
+        
+       
+
+END
+$BODY$;
+
+ALTER FUNCTION atm.post_atm_transaction_on_us(character varying, character varying, money, character varying)
+    OWNER TO postgres;

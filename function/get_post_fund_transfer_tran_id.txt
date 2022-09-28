@@ -1,0 +1,224 @@
+CREATE OR REPLACE FUNCTION sms.get_post_fund_transfer_tran_id(
+	from_acc_ character varying,
+	m_receivable_ character varying,
+	amount_ money,
+	statement_ character varying)
+    RETURNS TABLE (tran_id bigint)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+
+
+	DECLARE _cust_office_id	integer;
+	DECLARE _cor_office_id 	integer;
+	DECLARE _tran_id	bigint;
+	DECLARE _rem_tran_id	bigint;
+    DECLARE _ibt_tran_id 	bigint;
+	DECLARE _sys_id		integer;
+	DECLARE _date		date;
+	DECLARE _balance	money;
+	DECLARE _from_ac_id	bigint;
+	DECLARE _to_adv_ac	bigint;--mplanet receivable ledger
+    DECLARE _cor_ibt_pay_gl	bigint;--payable to corporate office from other office
+	DECLARE _cor_rem_rec_gl	bigint;--receivable from other office by corporate office
+	
+BEGIN	
+	SELECT sms.get_drawing_power(from_acc_) INTO _balance;
+
+	IF  _balance  <= amount_ THEN
+		RAISE EXCEPTION 'Not Enough Balance';
+
+		END IF;
+
+	SELECT office.get_sys_user_id() INTO _sys_id;
+	SELECT now()::date INTO _date;
+	
+
+	SELECT office_id, account_number_id FROM deposit.account_holders WHERE account_number=from_acc_ INTO _cust_office_id, _from_ac_id;
+
+	SELECT gl_account_id INTO _to_adv_ac FROM core.gl_accounts  WHERE account_name = m_receivable_;
+	SELECT office_id FROM office.offices WHERE parent_office_id IS NULL INTO _cor_office_id;
+
+IF _cust_office_id = _cor_office_id THEN
+        INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id
+              )
+        SELECT _cust_office_id, _date, _date, 'Mbanking',$3,_sys_id, false, 1,_sys_id,_sys_id;
+		
+		  SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id)
+
+        select _tran_id, deposit.product_gl_account_id($1),_from_ac_id, $3, NULL, $4, _sys_id union all 
+        select _tran_id, _to_adv_ac, NULL, NULL, $3, $4, _sys_id;
+		
+		return query (select _tran_id);
+
+ELSE
+
+		SELECT local_payable_gl_account_id INTO _cor_ibt_pay_gl FROM core.ibt_setup
+        WHERE local_office_id=_cor_office_id;
+		
+		SELECT local_receivable_gl_account_id INTO _cor_rem_rec_gl FROM core.ibt_setup
+        WHERE local_office_id=_cust_office_id;	
+
+		INSERT INTO transactions.ibt_transactions(book_name,local_office_id,audit_user_id)
+        SELECT 'Mbanking',_cust_office_id,_sys_id;
+        
+                
+        SELECT CURRVAL('transactions.ibt_transactions_ibt_tran_id_seq') INTO _ibt_tran_id;
+
+            INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id
+              )
+        SELECT _cust_office_id, _date, _date, 'Mbanking',$3,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+        SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id)
+
+        select _tran_id, deposit.product_gl_account_id($1),_from_ac_id, $3, NULL, $4, _sys_id union all 
+        select _tran_id, _cor_ibt_pay_gl,NULL, NULL, $3, $4, _sys_id;
+
+      INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id
+              )
+      SELECT _cor_office_id, _date, _date, 'Mbanking', $3,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+      SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _rem_tran_id;
+
+			INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id, debit, credit, statement_reference, audit_user_id  )
+
+		select _rem_tran_id, _cor_rem_rec_gl, $3, NULL, $4, _sys_id union all 
+        select _rem_tran_id, _to_adv_ac, NULL, $3, $4, _sys_id;
+		
+		return query (select _tran_id);
+        
+        END IF;
+
+
+END
+
+$BODY$;
+
+
+
+-- FUNCTION: sms.auto_reverse_entry(character varying, character varying, money, character varying)
+
+-- DROP FUNCTION IF EXISTS sms.auto_reverse_entry(character varying, character varying, money, character varying);
+
+CREATE OR REPLACE FUNCTION sms.get_auto_reverse_entry_tran_id(
+	from_acc_ character varying,
+	m_receivable_ character varying,
+	amount_ money,
+	statement_ character varying)
+    RETURNS TABLE (tran_id bigint)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+
+
+	DECLARE _from_office_id	integer;
+	DECLARE _cor_office_id 	integer;
+	DECLARE _tran_id	bigint;
+	DECLARE _rem_tran_id	bigint;
+    DECLARE _ibt_tran_id 	bigint;
+	DECLARE _sys_id		integer;
+	DECLARE _date		date;
+	DECLARE _balance	money;
+	DECLARE _from_ac_id	bigint;
+	DECLARE _to_adv_ac	bigint;--mplanet receivable ledger
+    DECLARE _cor_ibt_pay_gl	bigint;--payable to corporate office from other office
+	DECLARE _cor_rem_rec_gl	bigint;--receivable from other office by corporate office
+	
+BEGIN	
+	
+
+	SELECT office.get_sys_user_id() INTO _sys_id;
+	SELECT now()::date INTO _date;
+	
+
+	SELECT office_id, account_number_id FROM deposit.account_holders WHERE account_number=from_acc_ INTO _from_office_id, _from_ac_id;
+
+	SELECT gl_account_id INTO _to_adv_ac FROM core.gl_accounts  WHERE account_name = m_receivable_;
+	SELECT office_id FROM office.offices WHERE parent_office_id IS NULL INTO _cor_office_id;
+
+IF _from_office_id = _cor_office_id THEN
+        INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id
+              )
+        SELECT _from_office_id, _date, _date, 'AutoReverse',$3,_sys_id, false, 1,_sys_id,_sys_id;
+		SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id)
+
+		select _tran_id, _to_adv_ac, NULL, $3, NULL, $4, _sys_id UNION ALL
+        select _tran_id, deposit.product_gl_account_id($1),_from_ac_id, NULL, $3, $4, _sys_id;
+        RETURN QUERY (SELECT _tran_id);
+
+ELSE
+
+		SELECT local_payable_gl_account_id INTO _cor_ibt_pay_gl FROM core.ibt_setup
+        WHERE local_office_id=_cor_office_id;
+		
+		SELECT local_receivable_gl_account_id INTO _cor_rem_rec_gl FROM core.ibt_setup
+        WHERE local_office_id=_from_office_id;	
+
+		INSERT INTO transactions.ibt_transactions(book_name,local_office_id,audit_user_id)
+        SELECT 'AutoReverse',_from_office_id,_sys_id;
+        
+                
+        SELECT CURRVAL('transactions.ibt_transactions_ibt_tran_id_seq') INTO _ibt_tran_id;
+
+            INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id
+              )
+        SELECT _from_office_id, _date, _date, 'AutoReverse',$3,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+        SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _tran_id;
+
+          INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id,account_number_id, debit, credit, statement_reference, audit_user_id) 
+        select _tran_id, _cor_ibt_pay_gl,NULL, $3, NULL, $4, _sys_id UNION ALL
+		select _tran_id, deposit.product_gl_account_id($1),_from_ac_id, NULL, $3, $4, _sys_id ;
+
+      INSERT INTO transactions.transactions(
+            office_id, tran_date, value_date, book_name, 
+            total_amount, teller_id, is_flagged, verification_status_id,
+            verified_by_user_id, audit_user_id, ibt_tran_id
+              )
+      SELECT _cor_office_id, _date, _date, 'AutoReverse', $3,_sys_id, false, 1,_sys_id,_sys_id, _ibt_tran_id;
+
+      SELECT CURRVAL('transactions.transactions_tran_id_seq') INTO _rem_tran_id;
+
+			INSERT INTO transactions.transaction_details(
+            tran_id, gl_account_id, debit, credit, statement_reference, audit_user_id  )
+
+		select _rem_tran_id, _to_adv_ac, $3, NULL, $4, _sys_id union all
+		select _rem_tran_id, _cor_rem_rec_gl, NULL, $3, $4, _sys_id ;
+        RETURN QUERY (SELECT _tran_id);
+        
+        END IF;
+        
+END
+
+$BODY$;
+
+ALTER FUNCTION sms.auto_reverse_entry(character varying, character varying, money, character varying)
+    OWNER TO postgres;

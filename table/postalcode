@@ -1,0 +1,105 @@
+CREATE TABLE core.district_name(
+	district_id serial PRIMARY KEY NOT NULL,
+	province_id integer REFERENCES core.province_name(province_id) NOT NULL,
+	district_name character varying NOT NULL,
+	district_name_np character varying,
+	postal_code integer);
+
+
+CREATE TABLE IF NOT EXISTS core.province_name
+(
+    province_id integer NOT NULL DEFAULT nextval('core.province_name_province_id_seq'::regclass),
+    province_name character varying COLLATE pg_catalog."default" NOT NULL,
+    province_name_np character varying COLLATE pg_catalog."default",
+    CONSTRAINT province_name_pkey PRIMARY KEY (province_id)
+);
+
+
+insert into core.province_name(province_name)
+	select 'Province No. 1' union all
+select 'Province No. 2' union all
+select 'Bagmati Province' union all
+select 'Gandaki Province' union all
+select 'Gandaki Province' union all
+select 'Karnali Province' union all
+select 'Sudur-Paschim Province';
+
+
+insert into core.district_name(province_id,district_name,postal_code)
+select 1,'Bhojpur',57000 union all
+select 1,'Dhankuta',56800 union all
+select 1,'Ilam',57300 union all
+select 1,'Jhapa',57200 union all
+select 1,'Khotang',56800 union all
+select 1,'Morang',57300 union all
+select 1,'Okhaldhunga',57000 union all
+select 1,'Panchthar',56800 union all
+select 1,'Sankhuwasabha',57300 union all
+select 1,'Solukhumbu',57000 union all
+select 1,'Sunsari',56800 union all
+select 1,'Taplejung',57300 union all
+select 1,'Terhathum',56800 union all
+select 1,'Udayapur',57300 union all
+select 2,'Bara',44400 union all
+select 2,'Dhanusa',45600 union all
+select 2,'Mahottari',45700 union all
+select 2,'Parsa',44300 union all
+select 2,'Rautahat',44500 union all
+select 2,'Saptari',56400 union all
+select 2,'Sarlahi',54800 union all
+select 2,'Siraha',56500 union all
+select 3,'Bhaktapur',44800 union all
+select 3,'Chitwan',44200 union all
+select 3,'Dhading',45100 union all
+select 3,'Dolakha',45500 union all
+select 3,'Kathmandu',44600 union all
+select 3,'Kavrepalanchok',45200 union all
+select 3,'Lalitpur',44700 union all
+select 3,'Makawanpur',44100 union all
+select 3,'Nuwakot',44900 union all
+select 3,'Ramechhap',45400 union all
+select 3,'Rasuwa',45000 union all
+select 3,'Sindhuli',45300 union all
+select 3,'Sindhupalchok',45900 union all
+select 4,'Baglung',33300 union all
+select 4,'Gorkha',34000 union all
+select 4,'Kaski',33700 union all
+select 4,'Lamjung',33600 union all
+select 4,'Manang',33500 union all
+select 4,'Mustang',33100 union all
+select 4,'Myagdi',33200 union all
+select 4,'Nawalpur',45306 union all
+select 4,'Parbat',33400 union all
+select 4,'Syangja',33800 union all
+select 4,'Tanahu',33900 union all
+select 5,'Arghakhanchi',32700 union all
+select 5,'Banke',21900 union all
+select 5,'Bardiya',21800 union all
+select 5,'Dang',22400 union all
+select 5,'Gulmi',32600 union all
+select 5,'Kapilvastu',32800 union all
+select 5,'Nawalparasi',33000 union all
+select 5,'Palpa',32500 union all
+select 5,'Pyuthan',22300 union all
+select 5,'Rolpa',22100 union all
+select 5,'Rukum',22000 union all
+select 5,'Rupandehi',32900 union all
+select 6,'Dailekh',21600 union all
+select 6,'Dolpa',21400 union all
+select 6,'Humla',21000 union all
+select 6,'Jajarkot',21500 union all
+select 6,'Jumla',21200 union all
+select 6,'Kalikot',21300 union all
+select 6,'Mugu',21100 union all
+select 6,'Rukum Paschim',22002 union all
+select 6,'Salyan',22200 union all
+select 6,'Surkhet',21700 union all
+select 7,'Achham',10700 union all
+select 7,'Baitadi',10200 union all
+select 7,'Bajhang',10500 union all
+select 7,'Bajura',10600 union all
+select 7,'Dadeldhura',1300 union all
+select 7,'Darchula',10100 union all
+select 7,'Doti',10800 union all
+select 7,'Kailali',10900 union all
+select 7,'Kanchanpur',10400;
