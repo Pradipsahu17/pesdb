@@ -1,0 +1,22 @@
+CREATE OR REPLACE FUNCTION core.get_copomis_report(
+	office_id_ integer,
+	from_ date,
+	to_ date)
+	RETURNS TABLE(sn bigint, account_head character varying, debit money, credit money)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(	
+			SELECT ROW_NUMBER() OVER() sn, h.account_head, SUM(t.debit), SUM(t.credit)
+			FROM core.copomis_setup s
+			INNER JOIN core.copomis_heading h ON h.heading_id = s.heading_id
+			INNER JOIN transactions.transactions_view t ON s.gl_account_id = t.gl_account_id
+			WHERE t.office_id = $1
+			AND t.tran_date BETWEEN $2 AND $3
+			GROUP BY h.account_head, h.heading_id
+			ORDER BY h.heading_id
+		);
+	END
+$BODY$;

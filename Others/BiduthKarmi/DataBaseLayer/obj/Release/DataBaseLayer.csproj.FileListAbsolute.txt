@@ -1,6 +1,0 @@
-J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\DataBaseLayer\bin\Release\DataBaseLayer.dll
-J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\DataBaseLayer\bin\Release\DataBaseLayer.pdb
-J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\DataBaseLayer\obj\Release\DataBaseLayer.csproj.AssemblyReference.cache
-J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\DataBaseLayer\obj\Release\DataBaseLayer.csproj.CoreCompileInputs.cache
-J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\DataBaseLayer\obj\Release\DataBaseLayer.dll
-J:\PES\ElectricityWorkers\ElectricityWorkers\BiduthKarmi\DataBaseLayer\obj\Release\DataBaseLayer.pdb

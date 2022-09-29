@@ -1,0 +1,30 @@
+CREATE OR REPLACE FUNCTION transactions.update_transfer_date_from_tran_id(
+	tran_id_ bigint,
+	requested_by_ character varying,
+	statement_reference_ character varying,
+	modified_by_ character varying,
+	user_id_ integer,
+	tran_date_ date,
+	value_date_ date)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE _ibt_tran_id bigint;
+BEGIN
+    SELECT ibt_tran_id FROM transactions.transactions INTO _ibt_tran_id WHERE tran_id = $1;
+	
+	IF _ibt_tran_id IS NOT NULL THEN
+	
+	UPDATE transactions.transactions t SET tran_date = COALESCE($6,t.tran_date), value_date = COALESCE($7,t.value_date) WHERE ibt_tran_id=_ibt_tran_id;
+	ELSE
+	UPDATE transactions.transactions t SET tran_date = COALESCE($6,t.tran_date), value_date = COALESCE($7,t.value_date) WHERE tran_id = $1;
+	END IF;
+	
+	INSERT INTO transactions.rejected_transactions(tran_id, requested_by, statement_reference, modified_by, audit_user_id)
+	SELECT $1, $2, $3, $4, $5;
+	
+	RETURN true;
+END
+$BODY$;

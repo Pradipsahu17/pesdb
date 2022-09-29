@@ -1,0 +1,20 @@
+-- SELECT * FROM office.get_checked_in_employee('2021-10-10')
+
+CREATE OR REPLACE FUNCTION office.get_checked_in_employee(
+	date_ date)
+	RETURNS TABLE(sn bigint, employee_id bigint, employee_name character varying)
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		RETURN QUERY(
+			SELECT ROW_NUMBER() OVER(ORDER BY a.employee_id),
+				a.employee_id,
+				e.employee_name
+			FROM office.attendance_records a
+			INNER JOIN office.employee_info e ON e.employee_id = a.employee_id
+			WHERE a.is_present = true AND a.attendance_date = $1
+		);
+	END
+$BODY$;

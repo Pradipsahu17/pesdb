@@ -1,0 +1,16 @@
+CREATE OR REPLACE FUNCTION core.validate_copomis_gl_account(
+	gl_account_id_ bigint)
+	RETURNS boolean
+	LANGUAGE 'plpgsql'
+	COST 100
+	VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	BEGIN
+		IF $1 NOT IN (SELECT gl_account_id FROM core.copomis_setup)
+		THEN
+			RETURN true;
+		ELSE
+			RETURN false;
+		END IF;
+	END
+$BODY$;
